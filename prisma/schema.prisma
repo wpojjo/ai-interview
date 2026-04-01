@@ -90,14 +90,18 @@ model Activity {
 }
 
 model JobPosting {
-  id         String   @id @default(cuid())
-  sessionId  String
-  sourceType String
-  sourceUrl  String?
-  rawText    String?
-  fileName   String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               String   @id @default(cuid())
+  sessionId        String
+  sourceType       String
+  sourceUrl        String?
+  rawText          String?
+  fileName         String?
+  companyInfo      String?
+  responsibilities String?
+  requirements     String?
+  preferredQuals   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   session GuestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 

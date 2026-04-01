@@ -60,5 +60,13 @@ export const jobPostingSchema = z.object({
   { message: "선택한 입력 방식에 맞는 내용을 입력해주세요" }
 );
 
+export const jobPostingAnalysisSchema = z.object({
+  companyInfo:      z.string(),
+  responsibilities: z.string(),
+  requirements:     z.string(),
+  preferredQuals:   z.string(),
+});
+
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type JobPostingInput = z.infer<typeof jobPostingSchema>;
+export type JobPostingAnalysis = z.infer<typeof jobPostingAnalysisSchema>;
