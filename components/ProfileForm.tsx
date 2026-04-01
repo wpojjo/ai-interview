@@ -39,9 +39,13 @@ interface Activity {
   description?: string | null;
 }
 
+interface InitialEducation extends Omit<Education, "graduationStatus"> {
+  graduationStatus: string;
+}
+
 interface InitialData {
   name?: string;
-  educations?: Education[];
+  educations?: InitialEducation[];
   careers?: Career[];
   certifications?: Certification[];
   activities?: Activity[];
@@ -63,7 +67,9 @@ function newActivity(): Activity {
 export default function ProfileForm({ initialData }: { initialData?: InitialData | null }) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [educations, setEducations] = useState<Education[]>(
-    initialData?.educations?.length ? initialData.educations : []
+    initialData?.educations?.length
+      ? initialData.educations.map((e) => ({ ...e, graduationStatus: e.graduationStatus as Education["graduationStatus"] }))
+      : []
   );
   const [careers, setCareers] = useState<Career[]>(
     initialData?.careers?.length ? initialData.careers : []
