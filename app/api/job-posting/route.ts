@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getSessionFromCookie } from "@/lib/session";
 import { jobPostingSchema } from "@/lib/schemas";
-import { v4 as uuidv4 } from "uuid";
 
 export async function GET() {
   try {
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
     } else {
       const { data } = await supabase
         .from("job_postings")
-        .insert({ id: uuidv4(), sessionId, sourceType, sourceUrl: sourceUrl ?? null, rawText: rawText ?? null, fileName: fileName ?? null, updatedAt: now })
+        .insert({ id: crypto.randomUUID(), sessionId, sourceType, sourceUrl: sourceUrl ?? null, rawText: rawText ?? null, fileName: fileName ?? null, updatedAt: now })
         .select()
         .single();
       jobPosting = data;

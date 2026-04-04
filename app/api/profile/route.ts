@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getSessionFromCookie } from "@/lib/session";
 import { profileSchema } from "@/lib/schemas";
-import { v4 as uuidv4 } from "uuid";
 
 export async function GET() {
   try {
@@ -86,18 +85,18 @@ export async function POST(request: NextRequest) {
       ]);
       await supabase.from("profiles").update({ name, updatedAt: now }).eq("id", profileId);
     } else {
-      profileId = uuidv4();
+      profileId = crypto.randomUUID();
       await supabase.from("profiles").insert({ id: profileId, sessionId, name, updatedAt: now });
     }
 
     if (educations.length > 0)
-      await supabase.from("educations").insert(educations.map(({ id: _id, ...e }) => ({ id: uuidv4(), profileId, ...e })));
+      await supabase.from("educations").insert(educations.map(({ id: _id, ...e }) => ({ id: crypto.randomUUID(), profileId, ...e })));
     if (careers.length > 0)
-      await supabase.from("careers").insert(careers.map(({ id: _id, ...c }) => ({ id: uuidv4(), profileId, ...c })));
+      await supabase.from("careers").insert(careers.map(({ id: _id, ...c }) => ({ id: crypto.randomUUID(), profileId, ...c })));
     if (certifications.length > 0)
-      await supabase.from("certifications").insert(certifications.map(({ id: _id, ...c }) => ({ id: uuidv4(), profileId, ...c })));
+      await supabase.from("certifications").insert(certifications.map(({ id: _id, ...c }) => ({ id: crypto.randomUUID(), profileId, ...c })));
     if (activities.length > 0)
-      await supabase.from("activities").insert(activities.map(({ id: _id, ...a }) => ({ id: uuidv4(), profileId, ...a })));
+      await supabase.from("activities").insert(activities.map(({ id: _id, ...a }) => ({ id: crypto.randomUUID(), profileId, ...a })));
 
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", profileId).single();
     const [
