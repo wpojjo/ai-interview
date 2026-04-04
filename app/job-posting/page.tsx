@@ -39,7 +39,7 @@ export default async function JobPostingPage() {
             <span>채용공고 입력</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">채용공고를 입력해주세요</h1>
-          <p className="text-gray-500 text-sm">링크, 텍스트, 또는 PDF 중 하나를 입력하면 됩니다</p>
+          <p className="text-gray-500 text-sm">채용공고 링크를 입력하면 AI가 자동으로 분석합니다</p>
         </div>
 
         <JobPostingForm initialData={jobPosting} />

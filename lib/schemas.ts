@@ -44,21 +44,8 @@ export const profileSchema = z.object({
 });
 
 export const jobPostingSchema = z.object({
-  sourceType: z.enum(["LINK", "TEXT", "PDF"], {
-    errorMap: () => ({ message: "입력 방식을 선택해주세요" }),
-  }),
-  sourceUrl: z.string().url("올바른 URL을 입력해주세요").optional().or(z.literal("")),
-  rawText: z.string().optional(),
-  fileName: z.string().optional(),
-}).refine(
-  (data) => {
-    if (data.sourceType === "LINK") return !!data.sourceUrl;
-    if (data.sourceType === "TEXT") return !!data.rawText;
-    if (data.sourceType === "PDF") return !!data.fileName;
-    return false;
-  },
-  { message: "선택한 입력 방식에 맞는 내용을 입력해주세요" }
-);
+  sourceUrl: z.string().url("올바른 URL을 입력해주세요"),
+});
 
 export const jobPostingAnalysisSchema = z.object({
   companyInfo:      z.string(),

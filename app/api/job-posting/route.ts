@@ -36,12 +36,12 @@ export async function POST(request: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "입력값이 올바르지 않습니다", details: parsed.error.flatten() },
+        { error: parsed.error.issues[0]?.message ?? "입력값이 올바르지 않습니다" },
         { status: 400 }
       );
     }
 
-    const { sourceType, sourceUrl, rawText, fileName } = parsed.data;
+    const { sourceUrl } = parsed.data;
     const now = new Date().toISOString();
 
     const { data: rows } = await supabase
@@ -57,7 +57,17 @@ export async function POST(request: NextRequest) {
     if (existing) {
       const { data } = await supabase
         .from("job_postings")
-        .update({ sourceType, sourceUrl: sourceUrl ?? null, rawText: rawText ?? null, fileName: fileName ?? null, updatedAt: now })
+        .update({
+          sourceType: "LINK",
+          sourceUrl,
+          rawText: null,
+          fileName: null,
+          companyInfo: null,
+          responsibilities: null,
+          requirements: null,
+          preferredQuals: null,
+          updatedAt: now,
+        })
         .eq("id", existing.id)
         .select()
         .single();
@@ -65,7 +75,13 @@ export async function POST(request: NextRequest) {
     } else {
       const { data } = await supabase
         .from("job_postings")
-        .insert({ id: crypto.randomUUID(), sessionId, sourceType, sourceUrl: sourceUrl ?? null, rawText: rawText ?? null, fileName: fileName ?? null, updatedAt: now })
+        .insert({
+          id: crypto.randomUUID(),
+          sessionId,
+          sourceType: "LINK",
+          sourceUrl,
+          updatedAt: now,
+        })
         .select()
         .single();
       jobPosting = data;
