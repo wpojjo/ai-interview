@@ -33,7 +33,7 @@ def extract_job_info(text: str) -> dict:
 항목명이 정확히 일치하지 않아도 의미가 같으면 해당 항목으로 분류하세요.
 
 분류 기준:
-- "업무 내용": 담당업무, 하는 일, 주요 역할, 업무 소개, What you'll do, Responsibilities 등
+- "업무 내용": 담당업무, 하는 일, 주요 역할, 업무 소개, 모집 분야, 직무 내용, What you'll do, Responsibilities 등
 - "지원 자격": 자격 요건, 필수 조건, 이런 분을 찾아요, Requirements, Qualifications 등
 - "우대 사항": 우대 조건, 이런 분이면 더 좋아요, Preferred, Nice to have 등
 
@@ -73,6 +73,8 @@ def extract_job_info(text: str) -> dict:
         "업무": "업무 내용",
         "담당": "업무 내용",
         "역할": "업무 내용",
+        "모집": "업무 내용",
+        "직무": "업무 내용",
         "자격": "지원 자격",
         "필수": "지원 자격",
         "요건": "지원 자격",
