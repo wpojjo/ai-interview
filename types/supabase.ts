@@ -180,12 +180,9 @@ export type Database = {
       }
       job_postings: {
         Row: {
-          companyInfo: string | null
           createdAt: string
-          fileName: string | null
           id: string
           preferredQuals: string | null
-          rawText: string | null
           requirements: string | null
           responsibilities: string | null
           sessionId: string
@@ -194,12 +191,9 @@ export type Database = {
           updatedAt: string
         }
         Insert: {
-          companyInfo?: string | null
           createdAt?: string
-          fileName?: string | null
           id: string
           preferredQuals?: string | null
-          rawText?: string | null
           requirements?: string | null
           responsibilities?: string | null
           sessionId: string
@@ -208,12 +202,9 @@ export type Database = {
           updatedAt?: string
         }
         Update: {
-          companyInfo?: string | null
           createdAt?: string
-          fileName?: string | null
           id?: string
           preferredQuals?: string | null
-          rawText?: string | null
           requirements?: string | null
           responsibilities?: string | null
           sessionId?: string

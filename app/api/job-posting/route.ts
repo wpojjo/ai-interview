@@ -60,9 +60,6 @@ export async function POST(request: NextRequest) {
         .update({
           sourceType: "LINK",
           sourceUrl,
-          rawText: null,
-          fileName: null,
-          companyInfo: null,
           responsibilities: null,
           requirements: null,
           preferredQuals: null,
