@@ -10,7 +10,8 @@
 | 이메일/비밀번호 로그인 · 회원가입 | ✅ |
 | 프로필 입력 — 이름 / 학력 / 경력 / 자격증 / 대외활동 | ✅ |
 | 채용공고 URL 입력 + AI 분석 (담당업무 / 자격요건 / 우대사항) | ✅ |
-| AI 면접 질문 생성 (5문항, 이름 개인화, 꼬리 질문) | ✅ |
+| AI 면접 질문 생성 (5문항, 80초 타이머, 이름 개인화, 꼬리 질문) | ✅ |
+| 면접 완료 후 피드백 (질문별 잘한점/개선점 + 총평 + 점수) | ✅ |
 
 ## 기술 스택
 
@@ -24,8 +25,9 @@
 ## 아키텍처
 
 브라우저 → Next.js (포트 3000)
-  /api/job-posting/analyze → Jina Reader 크롤링 + Ollama 분석
-  /api/interview/question  → Ollama 맞춤 질문 생성
+  /api/job-posting/analyze  → Jina Reader 크롤링 + Ollama 분석
+  /api/interview/question   → Ollama 맞춤 질문 생성
+  /api/interview/feedback   → Ollama 면접 피드백 생성
 
 ## 사전 요구사항
 
@@ -65,3 +67,43 @@ http://localhost:3000 접속
 
 Ollama가 별도 기기에서 실행 중이라면 OLLAMA_BASE_URL을 해당 기기의 IP로 설정하고,
 OLLAMA_HOST=0.0.0.0 ollama serve 로 외부 접근을 허용해야 합니다.
+
+## 프로젝트 구조
+
+```
+ai-interview/
+├── app/
+│   ├── api/
+│   │   ├── profile/route.ts
+│   │   ├── job-posting/
+│   │   │   ├── route.ts
+│   │   │   └── analyze/route.ts      # Jina Reader + Ollama 분석
+│   │   └── interview/
+│   │       ├── question/route.ts     # AI 면접 질문 생성
+│   │       └── feedback/route.ts     # 면접 완료 후 피드백 생성
+│   ├── (auth)/
+│   │   ├── login/page.tsx
+│   │   └── signup/page.tsx
+│   ├── profile/
+│   │   ├── page.tsx                  # 이름 입력
+│   │   └── detail/page.tsx           # 학력·경력·자격증·대외활동
+│   ├── job-posting/page.tsx
+│   ├── interview/page.tsx
+│   └── page.tsx
+├── components/
+│   ├── ProfileNameForm.tsx
+│   ├── ProfileForm.tsx
+│   ├── JobPostingForm.tsx
+│   ├── InterviewSession.tsx          # 면접 진행 + 피드백 화면
+│   └── Header.tsx
+├── lib/
+│   ├── supabase.ts
+│   ├── supabase-browser.ts
+│   ├── auth.ts
+│   ├── interview.ts
+│   └── schemas.ts
+├── middleware.ts
+├── types/supabase.ts
+├── start.bat
+└── .env.example
+```
