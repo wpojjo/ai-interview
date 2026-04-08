@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 
 export default function ProfileNameForm({ initialName }: { initialName?: string }) {
   const router = useRouter();
