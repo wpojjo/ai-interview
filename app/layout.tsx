@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import "./globals.css";
 import Header from "@/components/Header";
 import ProgressBarProvider from "@/components/ProgressBarProvider";
@@ -24,7 +23,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-gray-50 text-gray-900 antialiased dark:bg-slate-950 dark:text-slate-100">
-        <Suspense><ProgressBarProvider /></Suspense>
+        <ProgressBarProvider />
         <Header />
         {children}
       </body>

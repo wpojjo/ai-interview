@@ -1,14 +1,14 @@
 "use client";
 
-import { AppProgressBar } from "next-nprogress-bar";
+import NextTopLoader from "nextjs-toploader";
 
 export default function ProgressBarProvider() {
   return (
-    <AppProgressBar
-      height="3px"
+    <NextTopLoader
       color="#2563eb"
-      options={{ showSpinner: false }}
-      shallowRouting
+      height={3}
+      showSpinner={false}
+      shadow={false}
     />
   );
 }
