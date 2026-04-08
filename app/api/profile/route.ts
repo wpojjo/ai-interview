@@ -89,37 +89,22 @@ export async function POST(request: NextRequest) {
       await supabase.from("profiles").insert({ id: profileId, userId, name, updatedAt: now });
     }
 
-    if (educations.length > 0)
-      await supabase.from("educations").insert(educations.map(({ id: _id, ...e }) => ({ id: crypto.randomUUID(), profileId, ...e })));
-    if (careers.length > 0)
-      await supabase.from("careers").insert(careers.map(({ id: _id, ...c }) => ({ id: crypto.randomUUID(), profileId, ...c })));
-    if (certifications.length > 0)
-      await supabase.from("certifications").insert(certifications.map(({ id: _id, ...c }) => ({ id: crypto.randomUUID(), profileId, ...c })));
-    if (activities.length > 0)
-      await supabase.from("activities").insert(activities.map(({ id: _id, ...a }) => ({ id: crypto.randomUUID(), profileId, ...a })));
-
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", profileId).single();
-    const [
-      { data: savedEducations },
-      { data: savedCareers },
-      { data: savedCertifications },
-      { data: savedActivities },
-    ] = await Promise.all([
-      supabase.from("educations").select("*").eq("profileId", profileId),
-      supabase.from("careers").select("*").eq("profileId", profileId),
-      supabase.from("certifications").select("*").eq("profileId", profileId),
-      supabase.from("activities").select("*").eq("profileId", profileId),
+    await Promise.all([
+      educations.length > 0
+        ? supabase.from("educations").insert(educations.map(({ id: _id, ...e }) => ({ id: crypto.randomUUID(), profileId, ...e })))
+        : Promise.resolve(),
+      careers.length > 0
+        ? supabase.from("careers").insert(careers.map(({ id: _id, ...c }) => ({ id: crypto.randomUUID(), profileId, ...c })))
+        : Promise.resolve(),
+      certifications.length > 0
+        ? supabase.from("certifications").insert(certifications.map(({ id: _id, ...c }) => ({ id: crypto.randomUUID(), profileId, ...c })))
+        : Promise.resolve(),
+      activities.length > 0
+        ? supabase.from("activities").insert(activities.map(({ id: _id, ...a }) => ({ id: crypto.randomUUID(), profileId, ...a })))
+        : Promise.resolve(),
     ]);
 
-    return NextResponse.json({
-      profile: {
-        ...profile,
-        educations: savedEducations ?? [],
-        careers: savedCareers ?? [],
-        certifications: savedCertifications ?? [],
-        activities: savedActivities ?? [],
-      },
-    });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Profile POST error:", error);
     return NextResponse.json({ error: "프로필 저장 중 오류가 발생했습니다" }, { status: 500 });
