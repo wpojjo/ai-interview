@@ -11,12 +11,13 @@ import {
   MAX_FOLLOWUPS,
   getFirstQuestion,
 } from "@/lib/interview";
-import type { FeedbackResult } from "@/app/api/interview/feedback/route";
 import DifficultySelect from "@/components/DifficultySelect";
+import DebateLoading, { type DebateResultData } from "@/components/DebateLoading";
+import DebateResult from "@/components/DebateResult";
 
 const ANSWER_TIME_LIMIT = 80;
 
-type Phase = "selecting" | "interviewing";
+type Phase = "selecting" | "interviewing" | "debating" | "done";
 
 async function fetchQuestion(
   messages: Message[],
@@ -33,31 +34,24 @@ async function fetchQuestion(
   return data;
 }
 
-async function fetchFeedback(msgs: Message[]): Promise<FeedbackResult> {
-  const res = await fetch("/api/interview/feedback", {
+async function startDebate(
+  messages: Message[],
+  difficulty: Difficulty,
+): Promise<string> {
+  const res = await fetch("/api/interview/debate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: msgs }),
+    body: JSON.stringify({ messages, difficulty }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "피드백 생성에 실패했습니다");
-  return data.feedback;
+  if (!res.ok) throw new Error(data.error ?? "토론을 시작할 수 없습니다");
+  return data.sessionId as string;
 }
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function ScoreRing({ score }: { score: number }) {
-  const color = score >= 80 ? "text-green-500" : score >= 60 ? "text-blue-500" : "text-orange-500";
-  return (
-    <div className={`text-5xl font-bold ${color}`}>
-      {score}
-      <span className="text-2xl text-gray-400 dark:text-slate-500 font-normal">/100</span>
-    </div>
-  );
 }
 
 function AgentBadge({ agentId }: { agentId: AgentId }) {
@@ -82,15 +76,15 @@ export default function InterviewSession({ name }: { name: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [answer, setAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-  const [isFetchingFeedback, setIsFetchingFeedback] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackResult | null>(null);
-  const [feedbackError, setFeedbackError] = useState("");
   const [error, setError] = useState("");
   const [timeLeft, setTimeLeft] = useState(ANSWER_TIME_LIMIT);
+
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [debateResult, setDebateResult] = useState<DebateResultData | null>(null);
+  const [debateError, setDebateError] = useState("");
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 면접 시작: 조직 전문가 첫 질문 고정 설정
   function handleDifficultySelect(d: Difficulty) {
     setDifficulty(d);
     setMessages([{ role: "interviewer", content: getFirstQuestion(name), agentId: "organization" }]);
@@ -101,18 +95,17 @@ export default function InterviewSession({ name }: { name: string }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, isDone]);
+  }, [messages, isLoading, phase]);
 
   useEffect(() => {
     setTimeLeft(ANSWER_TIME_LIMIT);
   }, [messages.length]);
 
   useEffect(() => {
-    if (isDone || isLoading || phase !== "interviewing") return;
-    if (timeLeft <= 0) return;
+    if (phase !== "interviewing" || isLoading || timeLeft <= 0) return;
     const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(timer);
-  }, [timeLeft, isDone, isLoading, phase]);
+  }, [timeLeft, isLoading, phase]);
 
   async function handleSubmit() {
     const trimmed = answer.trim();
@@ -133,11 +126,8 @@ export default function InterviewSession({ name }: { name: string }) {
       const canFollowUp = followUpCount < maxFollowUps;
 
       if (canFollowUp) {
-        // 꼬리질문 시도
         const result = await fetchQuestion(updatedMessages, currentAgentId, true);
-
         if (result.followUp === false) {
-          // 에이전트 만족 → 다음 에이전트로
           await advanceToNextAgent(updatedMessages);
         } else if (result.question) {
           setMessages([
@@ -147,7 +137,6 @@ export default function InterviewSession({ name }: { name: string }) {
           setFollowUpCount((c) => c + 1);
         }
       } else {
-        // 꼬리질문 한도 초과 → 다음 에이전트로
         await advanceToNextAgent(updatedMessages);
       }
     } catch (e: unknown) {
@@ -161,22 +150,17 @@ export default function InterviewSession({ name }: { name: string }) {
     const nextAgentIndex = agentIndex + 1;
 
     if (nextAgentIndex >= TOTAL_AGENTS) {
-      // 모든 에이전트 완료 → 피드백
-      setIsDone(true);
-      setIsFetchingFeedback(true);
-      setFeedbackError("");
+      // 면접 종료 → 토론 시작
+      setPhase("debating");
       try {
-        const result = await fetchFeedback(currentMessages);
-        setFeedback(result);
+        const sid = await startDebate(currentMessages, difficulty);
+        setSessionId(sid);
       } catch (e: unknown) {
-        setFeedbackError(e instanceof Error ? e.message : "피드백 생성에 실패했습니다");
-      } finally {
-        setIsFetchingFeedback(false);
+        setDebateError(e instanceof Error ? e.message : "토론을 시작할 수 없습니다");
       }
       return;
     }
 
-    // 다음 에이전트 기본 질문 요청
     const nextAgentId = AGENT_ORDER[nextAgentIndex];
     const result = await fetchQuestion(currentMessages, nextAgentId, false);
     if (result.question) {
@@ -194,110 +178,78 @@ export default function InterviewSession({ name }: { name: string }) {
     setMessages([]);
     setAgentIndex(0);
     setFollowUpCount(0);
-    setIsDone(false);
     setAnswer("");
     setTimeLeft(ANSWER_TIME_LIMIT);
-    setFeedback(null);
-    setFeedbackError("");
     setError("");
+    setSessionId(null);
+    setDebateResult(null);
+    setDebateError("");
   }
 
-  // 난이도 선택 화면
+  // 난이도 선택
   if (phase === "selecting") {
     return <DifficultySelect onSelect={handleDifficultySelect} />;
   }
 
-  // 피드백 로딩 화면
-  if (isDone && isFetchingFeedback) {
-    return (
-      <div className="card flex flex-col items-center justify-center py-20 px-6 space-y-4 text-center">
-        <div className="flex gap-1.5">
-          <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0ms]" />
-          <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:150ms]" />
-          <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:300ms]" />
+  // 토론 중
+  if (phase === "debating") {
+    if (debateError) {
+      return (
+        <div className="card flex flex-col items-center justify-center py-16 px-6 space-y-4 text-center">
+          <p className="text-red-500 text-sm">{debateError}</p>
+          <button onClick={handleRestart} className="btn-primary">
+            다시 연습하기
+          </button>
         </div>
-        <p className="text-gray-600 dark:text-slate-400 font-medium">면접 피드백을 생성하고 있습니다</p>
-        <p className="text-gray-400 dark:text-slate-500 text-sm">잠시만 기다려주세요...</p>
-      </div>
-    );
-  }
+      );
+    }
 
-  // 피드백 결과 화면
-  if (isDone && feedback) {
-    return (
-      <div className="space-y-6">
-        <div className="card p-6 text-center space-y-3">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-slate-50">면접 완료!</h2>
-          <p className="text-gray-500 dark:text-slate-400 text-sm">
-            {name}님의 면접 피드백입니다
-          </p>
-          <ScoreRing score={feedback.score} />
-        </div>
-
-        <div className="card p-6 space-y-4">
-          <h3 className="font-bold text-gray-900 dark:text-slate-50">종합 평가</h3>
-          <div className="space-y-3">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
-              <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">강점</p>
-              <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{feedback.overall.strengths}</p>
-            </div>
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4">
-              <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-1">약점</p>
-              <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{feedback.overall.weaknesses}</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
-              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">핵심 조언</p>
-              <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{feedback.overall.advice}</p>
-            </div>
+    if (!sessionId) {
+      return (
+        <div className="card flex flex-col items-center justify-center py-20 px-6 space-y-4 text-center">
+          <div className="flex gap-1.5">
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0ms]" />
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:150ms]" />
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:300ms]" />
           </div>
+          <p className="text-gray-600 dark:text-slate-400 font-medium">토론을 시작하는 중...</p>
         </div>
+      );
+    }
 
-        <div className="space-y-3">
-          <h3 className="font-bold text-gray-900 dark:text-slate-50 px-1">질문별 피드백</h3>
-          {feedback.perQuestion.map((q, i) => (
-            <div key={i} className="card p-5 space-y-3">
-              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Q{i + 1}</p>
-              <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{q.question}</p>
-              <div className="space-y-2 pt-1">
-                <div className="flex gap-2">
-                  <span className="text-green-500 text-xs font-semibold mt-0.5 shrink-0">잘한 점</span>
-                  <p className="text-xs text-gray-600 dark:text-slate-400 leading-relaxed">{q.good}</p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-orange-500 text-xs font-semibold mt-0.5 shrink-0">개선점</span>
-                  <p className="text-xs text-gray-600 dark:text-slate-400 leading-relaxed">{q.improve}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <a href="/job-posting" className="btn-secondary text-center">채용공고 변경</a>
-          <button onClick={handleRestart} className="btn-primary">다시 연습하기</button>
-        </div>
-      </div>
-    );
-  }
-
-  // 피드백 에러 화면
-  if (isDone && feedbackError) {
     return (
-      <div className="card flex flex-col items-center justify-center py-16 px-6 space-y-4 text-center">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-50">면접 완료!</h2>
-        <p className="text-red-500 text-sm">{feedbackError}</p>
-        <div className="flex gap-3">
-          <a href="/job-posting" className="btn-secondary">채용공고 변경</a>
-          <button onClick={handleRestart} className="btn-primary">다시 연습하기</button>
-        </div>
-      </div>
+      <DebateLoading
+        sessionId={sessionId}
+        onDone={(result) => {
+          setDebateResult(result);
+          setPhase("done");
+        }}
+        onError={(msg) => {
+          setDebateError(msg);
+        }}
+      />
     );
   }
 
+  // 결과 화면
+  if (phase === "done" && debateResult) {
+    return (
+      <DebateResult
+        finalScore={debateResult.finalScore}
+        agentEvaluations={debateResult.agentEvaluations}
+        finalFeedback={debateResult.finalFeedback}
+        debateSummary={debateResult.debateSummary}
+        improvementTips={debateResult.improvementTips}
+        onRestart={handleRestart}
+      />
+    );
+  }
+
+  // 면접 진행
   const isAnswered = messages[messages.length - 1]?.role === "candidate";
-  const lastInterviewerIdx = messages.reduce((acc, m, i) => m.role === "interviewer" ? i : acc, -1);
+  const lastInterviewerIdx = messages.reduce((acc, m, i) => (m.role === "interviewer" ? i : acc), -1);
   const currentQuestion = isAnswered ? "" : (messages[lastInterviewerIdx]?.content ?? "");
-  const currentQuestionAgentId = isAnswered ? undefined : (messages[lastInterviewerIdx]?.agentId);
+  const currentQuestionAgentId = isAnswered ? undefined : messages[lastInterviewerIdx]?.agentId;
   const pastMessages = isAnswered ? messages : messages.slice(0, lastInterviewerIdx);
 
   const isTimeWarning = timeLeft <= 30 && timeLeft > 0;
@@ -305,7 +257,7 @@ export default function InterviewSession({ name }: { name: string }) {
 
   return (
     <div className="space-y-4">
-      {/* 진행 상황 — 에이전트 3단계 */}
+      {/* 진행 상황 */}
       <div className="flex items-center gap-2">
         {AGENT_ORDER.map((aid, i) => {
           const isDoneAgent = i < agentIndex;
@@ -324,14 +276,20 @@ export default function InterviewSession({ name }: { name: string }) {
             <div key={aid} className="flex-1 space-y-1">
               <div
                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                  isDoneAgent ? colorMap[aid] : isCurrentAgent ? dimMap[aid] : "bg-gray-200 dark:bg-slate-700"
+                  isDoneAgent
+                    ? colorMap[aid]
+                    : isCurrentAgent
+                      ? dimMap[aid]
+                      : "bg-gray-200 dark:bg-slate-700"
                 }`}
               />
-              <p className={`text-xs text-center truncate ${
-                isCurrentAgent
-                  ? "font-semibold text-gray-700 dark:text-slate-300"
-                  : "text-gray-400 dark:text-slate-600"
-              }`}>
+              <p
+                className={`text-xs text-center truncate ${
+                  isCurrentAgent
+                    ? "font-semibold text-gray-700 dark:text-slate-300"
+                    : "text-gray-400 dark:text-slate-600"
+                }`}
+              >
                 {AGENTS[aid].label}
               </p>
             </div>
@@ -366,7 +324,9 @@ export default function InterviewSession({ name }: { name: string }) {
       {currentQuestion && (
         <div className="card border-blue-100 dark:border-blue-900/50 p-5 space-y-1">
           {currentQuestionAgentId && <AgentBadge agentId={currentQuestionAgentId} />}
-          <p className="text-gray-900 dark:text-slate-100 text-base leading-relaxed pt-1">{currentQuestion}</p>
+          <p className="text-gray-900 dark:text-slate-100 text-base leading-relaxed pt-1">
+            {currentQuestion}
+          </p>
         </div>
       )}
 
@@ -396,10 +356,12 @@ export default function InterviewSession({ name }: { name: string }) {
         </div>
       )}
 
-      {/* 시간 초과 경고 */}
+      {/* 시간 초과 */}
       {isTimeUp && (
         <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-center">
-          <p className="text-red-600 dark:text-red-400 text-sm font-semibold">⏰ 시간이 초과됐습니다. 빠르게 답변을 마무리해주세요!</p>
+          <p className="text-red-600 dark:text-red-400 text-sm font-semibold">
+            ⏰ 시간이 초과됐습니다. 빠르게 답변을 마무리해주세요!
+          </p>
         </div>
       )}
 
@@ -417,9 +379,15 @@ export default function InterviewSession({ name }: { name: string }) {
           className="w-full resize-none border-0 outline-none text-sm text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 bg-transparent disabled:opacity-50"
         />
         <div className="flex justify-between items-center pt-1 border-t border-gray-100 dark:border-slate-700">
-          <span className={`text-xs font-medium tabular-nums ${
-            isTimeUp ? "text-red-500" : isTimeWarning ? "text-orange-500" : "text-gray-400 dark:text-slate-500"
-          }`}>
+          <span
+            className={`text-xs font-medium tabular-nums ${
+              isTimeUp
+                ? "text-red-500"
+                : isTimeWarning
+                  ? "text-orange-500"
+                  : "text-gray-400 dark:text-slate-500"
+            }`}
+          >
             {isTimeUp ? "시간 초과" : formatTime(timeLeft)}
           </span>
           <button

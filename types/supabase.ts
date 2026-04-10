@@ -157,6 +157,60 @@ export type Database = {
           },
         ]
       }
+      interview_sessions: {
+        Row: {
+          agentEvaluations: Json | null
+          createdAt: string | null
+          debateReplies: Json | null
+          debateSummary: string | null
+          difficulty: string
+          errorMessage: string | null
+          finalFeedback: Json | null
+          finalScore: number | null
+          id: string
+          improvementTips: Json | null
+          jobPostingId: string | null
+          messages: Json
+          status: string
+          updatedAt: string | null
+          userId: string
+        }
+        Insert: {
+          agentEvaluations?: Json | null
+          createdAt?: string | null
+          debateReplies?: Json | null
+          debateSummary?: string | null
+          difficulty: string
+          errorMessage?: string | null
+          finalFeedback?: Json | null
+          finalScore?: number | null
+          id: string
+          improvementTips?: Json | null
+          jobPostingId?: string | null
+          messages: Json
+          status?: string
+          updatedAt?: string | null
+          userId: string
+        }
+        Update: {
+          agentEvaluations?: Json | null
+          createdAt?: string | null
+          debateReplies?: Json | null
+          debateSummary?: string | null
+          difficulty?: string
+          errorMessage?: string | null
+          finalFeedback?: Json | null
+          finalScore?: number | null
+          id?: string
+          improvementTips?: Json | null
+          jobPostingId?: string | null
+          messages?: Json
+          status?: string
+          updatedAt?: string | null
+          userId?: string
+        }
+        Relationships: []
+      }
       job_postings: {
         Row: {
           createdAt: string
