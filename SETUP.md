@@ -109,24 +109,21 @@ Vercel 대시보드 → **Settings** → **Environment Variables** → `OLLAMA_B
 > 주의: ngrok 무료 플랜은 재실행 시 주소가 바뀔 수 있음. Ollama 재시작할 때마다 Vercel 환경변수도 업데이트해야 함.
 
 
-> 주의2: ngrok 계정 만들고 설치해서 authtoken을 등록해야 함.
+> 주의2: ngrok을 처음 사용한다면 아래 설치 과정이 필요합니다.
 
+**ngrok 설치 방법 (Windows)**
 
-> 설치 방법:
-> 1. https://ngrok.com/download 에서 Windows용 다운로드
-> 2. 압축 풀면 ngrok.exe 하나 나옴
-> 3. 그 폴더에서 PowerShell 열고 실행: .\ngrok.exe http 11434
->
->    또는 ngrok.exe를 C:\Windows\System32에 복사하면 어디서든 ngrok 명령어로 사용 가능합니다.
->    ngrok 계정도 필요합니다 (무료):
->    https://dashboard.ngrok.com 가입 후 authtoken 복사
->    
->    아래 명령어로 등록:
->
->    .\ngrok.exe config add-authtoken <your-token> 등록 후
->    .\ngrok.exe http 11434 실행하면 됩니다.
+1. [ngrok.com/download](https://ngrok.com/download)에서 Windows용 다운로드
+2. 압축 풀면 `ngrok.exe` 하나 나옴
+3. `ngrok.exe`를 `C:\Windows\System32`에 복사하면 어디서든 `ngrok` 명령어로 사용 가능
 
-  
+**ngrok 계정 등록 (무료, 최초 1회)**
 
+1. [dashboard.ngrok.com](https://dashboard.ngrok.com) 가입 후 authtoken 복사
+2. 아래 명령어로 등록:
 
-  
+```powershell
+.\ngrok.exe config add-authtoken <your-token>
+```
+
+이후 `ngrok http 11434` 실행하면 됩니다.
