@@ -10,6 +10,7 @@ interface Props {
   debateSummary: string;
   improvementTips: string[];
   onRestart: () => void;
+  onBack: () => void;
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -45,9 +46,18 @@ export default function DebateResult({
   debateSummary,
   improvementTips,
   onRestart,
+  onBack,
 }: Props) {
   return (
     <div className="space-y-6">
+      {/* 뒤로가기 */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+      >
+        ← 면접관 토론 돌아보기
+      </button>
+
       {/* 최종 점수 */}
       <div className="card p-6 text-center space-y-3">
         <h2 className="text-xl font-bold text-gray-900 dark:text-slate-50">면접 완료!</h2>
@@ -63,7 +73,7 @@ export default function DebateResult({
             const colors = AGENT_COLORS[e.agentId] ?? AGENT_COLORS.organization;
             return (
               <div key={e.agentId} className={`card p-5 space-y-3 border-l-4 ${colors.border}`}>
-                <div className="flex items-center justify-between">
+                <div className="flex items-start gap-2">
                   <div className="space-y-0.5">
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full ${colors.badge}`}
@@ -72,10 +82,6 @@ export default function DebateResult({
                     </span>
                     <p className="text-xs text-gray-400 dark:text-slate-500 pt-1">{e.criterion}</p>
                   </div>
-                  <span className="text-2xl font-bold text-gray-700 dark:text-slate-300">
-                    {e.score}
-                    <span className="text-sm font-normal text-gray-400 dark:text-slate-500">/100</span>
-                  </span>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">
                   {e.opinion}
@@ -85,7 +91,7 @@ export default function DebateResult({
                     {e.highlights.map((h, i) => (
                       <li key={i} className="text-xs text-gray-500 dark:text-slate-400 flex gap-1.5">
                         <span className="text-gray-300 dark:text-slate-600 shrink-0">•</span>
-                        {h}
+                        {h.replace(/\*\*/g, "")}
                       </li>
                     ))}
                   </ul>

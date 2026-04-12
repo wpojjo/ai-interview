@@ -16,55 +16,62 @@ async function runDebate(
   messages: Message[],
 ) {
   try {
-    // Round 0: 3 에이전트 병렬 독립 평가
-    const round0Results = await Promise.allSettled(
-      AGENT_ORDER.map((agentId) => generateAgentEvaluation(agentId, messages)),
-    );
-
-    const evaluations: AgentEvaluation[] = round0Results
-      .filter((r): r is PromiseFulfilledResult<AgentEvaluation> => r.status === "fulfilled")
-      .map((r) => r.value);
+    // Round 0: 에이전트 순차 평가 — 각자 완료 즉시 저장 (클라이언트에 실시간 표시)
+    const evaluations: AgentEvaluation[] = [];
+    for (const agentId of AGENT_ORDER) {
+      let evaluation: AgentEvaluation;
+      try {
+        evaluation = await generateAgentEvaluation(agentId, messages);
+      } catch {
+        continue; // 한 에이전트 실패 시 다음으로
+      }
+      evaluations.push(evaluation);
+      await supabase
+        .from("interview_sessions")
+        .update({
+          agentEvaluations: evaluations as unknown as Json,
+          status: evaluations.length === 1 ? "evaluating" : "debating",
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+    }
 
     if (evaluations.length < 2) {
       throw new Error("에이전트 평가 실패 (2개 미만 성공)");
     }
 
+    // Round 1: 순차 상호 반론 — 완료 즉시 저장 (클라이언트에 1명씩 표시)
+    const replies: AgentReply[] = [];
+    for (const myEval of evaluations) {
+      const others = evaluations.filter((e) => e.agentId !== myEval.agentId);
+      try {
+        const reply = await generateAgentReply(myEval.agentId, myEval, others, messages);
+        replies.push(reply);
+        await supabase
+          .from("interview_sessions")
+          .update({ debateReplies: replies as unknown as Json, updatedAt: new Date().toISOString() })
+          .eq("id", sessionId);
+      } catch {
+        continue;
+      }
+    }
+
     await supabase
       .from("interview_sessions")
-      .update({ agentEvaluations: evaluations as unknown as Json, status: "debating", updatedAt: new Date().toISOString() })
-      .eq("id", sessionId);
-
-    // Round 1: 병렬 상호 반론
-    const round1Results = await Promise.allSettled(
-      evaluations.map((myEval) => {
-        const others = evaluations.filter((e) => e.agentId !== myEval.agentId);
-        return generateAgentReply(myEval.agentId, myEval, others, messages);
-      }),
-    );
-
-    const replies: AgentReply[] = round1Results
-      .filter((r): r is PromiseFulfilledResult<AgentReply> => r.status === "fulfilled")
-      .map((r) => r.value);
-
-    await supabase
-      .from("interview_sessions")
-      .update({ debateReplies: replies as unknown as Json, status: "finalizing", updatedAt: new Date().toISOString() })
+      .update({ status: "finalizing", updatedAt: new Date().toISOString() })
       .eq("id", sessionId);
 
     // 중재자: 최종 결론
-    const repliesForScore: AgentReply[] =
+    const repliesForModerator: AgentReply[] =
       replies.length > 0
         ? replies
         : evaluations.map((e) => ({
             agentId: e.agentId,
             agentLabel: e.agentLabel,
-            revisedScore: e.score,
-            scoreChanged: false,
-            scoreReason: "",
             replies: [],
           }));
 
-    const moderatorResult = await generateModeratorResult(evaluations, repliesForScore, messages);
+    const moderatorResult = await generateModeratorResult(evaluations, repliesForModerator, messages);
 
     await supabase
       .from("interview_sessions")
