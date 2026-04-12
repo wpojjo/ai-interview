@@ -10,6 +10,7 @@ interface Props {
   debateSummary: string;
   improvementTips: string[];
   onRestart: () => void;
+  onBack: () => void;
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -45,9 +46,18 @@ export default function DebateResult({
   debateSummary,
   improvementTips,
   onRestart,
+  onBack,
 }: Props) {
   return (
     <div className="space-y-6">
+      {/* 뒤로가기 */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+      >
+        ← 면접관 토론 돌아보기
+      </button>
+
       {/* 최종 점수 */}
       <div className="card p-6 text-center space-y-3">
         <h2 className="text-xl font-bold text-gray-900 dark:text-slate-50">면접 완료!</h2>

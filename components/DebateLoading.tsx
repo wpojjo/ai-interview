@@ -133,6 +133,7 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
 
   const [visibleMsgs, setVisibleMsgs] = useState<ChatMsg[]>([]);
   const [typingAgentId, setTypingAgentId] = useState<AgentId | null>(null);
+  const [showProceedButton, setShowProceedButton] = useState(false);
 
   const pendingQueue = useRef<ChatMsg[]>([]);
   const queuedEvalCount = useRef(0);
@@ -141,6 +142,8 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const debateFinishedRef = useRef(false);
+  const pendingResult = useRef<DebateResultData | null>(null);
 
   // 폴링
   useEffect(() => {
@@ -156,13 +159,19 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
 
         if (data.status === "done") {
           clearInterval(pollRef.current);
-          onDone({
+          // 결과 저장 후 큐가 비면 버튼 표시 (onDone은 버튼 클릭 시 호출)
+          pendingResult.current = {
             agentEvaluations: data.agentEvaluations ?? [],
             finalScore: data.finalScore ?? 0,
             finalFeedback: data.finalFeedback ?? { strengths: "", weaknesses: "", advice: "" },
             debateSummary: data.debateSummary ?? "",
             improvementTips: data.improvementTips ?? [],
-          });
+          };
+          debateFinishedRef.current = true;
+          // 큐가 이미 비어있으면 즉시 버튼 표시 (모든 메시지가 이미 출력된 경우)
+          if (pendingQueue.current.length === 0 && !popTimerRef.current) {
+            setShowProceedButton(true);
+          }
         } else if (data.status === "error") {
           clearInterval(pollRef.current);
           onError(data.errorMessage ?? "토론 중 오류가 발생했습니다");
@@ -173,7 +182,7 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
     poll();
     pollRef.current = setInterval(poll, 1500);
     return () => clearInterval(pollRef.current);
-  }, [sessionId, onDone, onError]);
+  }, [sessionId, onError]);
 
   // Round 0 평가 → 큐 추가
   useEffect(() => {
@@ -233,6 +242,8 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
     const next = pendingQueue.current.shift();
     if (!next) {
       setTypingAgentId(null);
+      // 큐 비었고 토론 완료면 버튼 표시
+      if (debateFinishedRef.current) setShowProceedButton(true);
       return;
     }
 
@@ -266,10 +277,11 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
   }, [visibleMsgs, typingAgentId]);
 
   // 타이핑 에이전트 결정 (큐 없을 때 현재 상태 기반)
+  const nonSystemMsgCount = visibleMsgs.filter((m) => !m.isSystem).length;
   const displayTypingId: AgentId | null =
     typingAgentId ??
-    (currentStatus === "evaluating" && visibleMsgs.filter((m) => !m.isSystem).length < 3
-      ? (AGENT_ORDER[visibleMsgs.filter((m) => !m.isSystem).length] ?? null)
+    ((currentStatus === "evaluating" || currentStatus === "debating") && nonSystemMsgCount < 3
+      ? (AGENT_ORDER[nonSystemMsgCount] ?? null)
       : null);
 
   const isActive = currentStatus !== "done" && currentStatus !== "error";
@@ -322,6 +334,16 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
         <p className="text-xs text-gray-400 dark:text-slate-500 text-center">
           Ollama 모델에 따라 1~3분 소요될 수 있습니다
         </p>
+      )}
+
+      {/* 최종 평가 보기 버튼 */}
+      {showProceedButton && pendingResult.current && (
+        <button
+          onClick={() => onDone(pendingResult.current!)}
+          className="btn-primary w-full"
+        >
+          최종 평가 보기 →
+        </button>
       )}
     </div>
   );

@@ -375,8 +375,8 @@ export default function InterviewSession({ name }: { name: string }) {
     return <DifficultySelect onSelect={handleDifficultySelect} />;
   }
 
-  // 토론 중
-  if (phase === "debating") {
+  // 토론 중 or 결과 화면 (DebateLoading은 항상 마운트 유지 — 뒤로가기 시 상태 보존)
+  if (phase === "debating" || phase === "done") {
     if (debateError) {
       return (
         <div className="card flex flex-col items-center justify-center py-16 px-6 space-y-4 text-center">
@@ -402,31 +402,33 @@ export default function InterviewSession({ name }: { name: string }) {
     }
 
     return (
-      <DebateLoading
-        sessionId={sessionId}
-        avatarSeeds={avatarSeeds}
-        onDone={(result) => {
-          setDebateResult(result);
-          setPhase("done");
-        }}
-        onError={(msg) => {
-          setDebateError(msg);
-        }}
-      />
-    );
-  }
+      <>
+        {/* 결과 화면일 때 DebateLoading을 숨김 (마운트는 유지 — 뒤로가기 상태 보존) */}
+        <div className={phase === "done" ? "hidden" : ""}>
+          <DebateLoading
+            sessionId={sessionId}
+            avatarSeeds={avatarSeeds}
+            onDone={(result) => {
+              setDebateResult(result);
+              setPhase("done");
+            }}
+            onError={(msg) => setDebateError(msg)}
+          />
+        </div>
 
-  // 결과 화면
-  if (phase === "done" && debateResult) {
-    return (
-      <DebateResult
-        finalScore={debateResult.finalScore}
-        agentEvaluations={debateResult.agentEvaluations}
-        finalFeedback={debateResult.finalFeedback}
-        debateSummary={debateResult.debateSummary}
-        improvementTips={debateResult.improvementTips}
-        onRestart={handleRestart}
-      />
+        {/* 결과 화면 */}
+        {phase === "done" && debateResult && (
+          <DebateResult
+            finalScore={debateResult.finalScore}
+            agentEvaluations={debateResult.agentEvaluations}
+            finalFeedback={debateResult.finalFeedback}
+            debateSummary={debateResult.debateSummary}
+            improvementTips={debateResult.improvementTips}
+            onRestart={handleRestart}
+            onBack={() => setPhase("debating")}
+          />
+        )}
+      </>
     );
   }
 
