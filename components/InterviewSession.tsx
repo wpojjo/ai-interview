@@ -54,16 +54,168 @@ function formatTime(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function AgentBadge({ agentId }: { agentId: AgentId }) {
-  const colorMap: Record<AgentId, string> = {
-    organization: "text-purple-600 dark:text-purple-400",
-    logic: "text-blue-600 dark:text-blue-400",
-    technical: "text-green-600 dark:text-green-400",
-  };
+const AGENT_META: Record<AgentId, { color: string; bg: string; avatarUrl: string; role: string }> = {
+  organization: {
+    color: "text-purple-600 dark:text-purple-400",
+    bg: "bg-purple-100 dark:bg-purple-900/40",
+    avatarUrl: "https://api.dicebear.com/9.x/notionists/svg?seed=organization&backgroundColor=e9d5ff",
+    role: "조직 · 문화 전문가",
+  },
+  logic: {
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-100 dark:bg-blue-900/40",
+    avatarUrl: "https://api.dicebear.com/9.x/notionists/svg?seed=logic&backgroundColor=bfdbfe",
+    role: "논리 · 경험 전문가",
+  },
+  technical: {
+    color: "text-green-600 dark:text-green-400",
+    bg: "bg-green-100 dark:bg-green-900/40",
+    avatarUrl: "https://api.dicebear.com/9.x/notionists/svg?seed=technical&backgroundColor=bbf7d0",
+    role: "직무 역량 전문가",
+  },
+};
+
+function useTypewriter(text: string, speed = 18) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    if (!text) return;
+
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) {
+        clearInterval(interval);
+        setDone(true);
+      }
+    }, speed);
+
+    return () => clearInterval(interval);
+  }, [text, speed]);
+
+  return { displayed, done };
+}
+
+const AGENT_RING: Record<AgentId, string> = {
+  organization: "ring-purple-400 dark:ring-purple-500",
+  logic: "ring-blue-400 dark:ring-blue-500",
+  technical: "ring-green-400 dark:ring-green-500",
+};
+
+const AGENT_GLOW: Record<AgentId, string> = {
+  organization: "shadow-[0_0_20px_4px_rgba(168,85,247,0.35)]",
+  logic: "shadow-[0_0_20px_4px_rgba(59,130,246,0.35)]",
+  technical: "shadow-[0_0_20px_4px_rgba(34,197,94,0.35)]",
+};
+
+function InterviewerPanel({
+  agentIndex,
+  isLoading,
+  isSpeaking,
+}: {
+  agentIndex: number;
+  isLoading: boolean;
+  isSpeaking: boolean;
+}) {
   return (
-    <span className={`text-xs font-semibold ${colorMap[agentId]}`}>
-      {AGENTS[agentId].label}
-    </span>
+    <div className="grid grid-cols-3 gap-3">
+      {AGENT_ORDER.map((aid, i) => {
+        const meta = AGENT_META[aid];
+        const isActive = i === agentIndex;
+        const isDone = i < agentIndex;
+        const isPending = i > agentIndex;
+
+        return (
+          <div
+            key={aid}
+            className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all duration-300 ${
+              isActive
+                ? "bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 shadow-md"
+                : isDone
+                  ? "bg-gray-50 dark:bg-slate-800/50 opacity-50"
+                  : "bg-gray-50 dark:bg-slate-800/30 opacity-40"
+            }`}
+          >
+            {/* 아바타 */}
+            <div className="relative">
+              <div
+                className={`w-20 h-20 rounded-full overflow-hidden border-4 transition-all duration-300 ${
+                  isActive
+                    ? `border-white dark:border-slate-700 ring-4 ${AGENT_RING[aid]} ${AGENT_GLOW[aid]}`
+                    : "border-white dark:border-slate-700"
+                }`}
+              >
+                <img
+                  src={meta.avatarUrl}
+                  alt={AGENTS[aid].label}
+                  className={`w-full h-full object-cover transition-all duration-300 ${isPending ? "grayscale" : ""}`}
+                />
+              </div>
+              {/* 발언 중 표시 */}
+              {isActive && isSpeaking && (
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    aid === "organization" ? "bg-purple-400" : aid === "logic" ? "bg-blue-400" : "bg-green-400"
+                  }`} />
+                  <span className={`relative inline-flex rounded-full h-4 w-4 ${
+                    aid === "organization" ? "bg-purple-500" : aid === "logic" ? "bg-blue-500" : "bg-green-500"
+                  }`} />
+                </span>
+              )}
+              {/* 완료 표시 */}
+              {isDone && (
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">
+                  ✓
+                </span>
+              )}
+              {/* 로딩 표시 */}
+              {isActive && isLoading && (
+                <span className="absolute -bottom-1 -right-1 flex gap-0.5 bg-white dark:bg-slate-800 rounded-full px-1.5 py-0.5 shadow-sm border border-gray-100 dark:border-slate-700">
+                  <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                </span>
+              )}
+            </div>
+
+            {/* 이름 */}
+            <div className="text-center">
+              <p className={`text-xs font-semibold ${isActive ? meta.color : "text-gray-400 dark:text-slate-500"}`}>
+                {AGENTS[aid].label}
+              </p>
+              {isActive && (
+                <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">{meta.role}</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function QuestionBubble({ agentId, question }: { agentId: AgentId; question: string }) {
+  const { displayed, done } = useTypewriter(question);
+  const agentIdx = AGENT_ORDER.indexOf(agentId);
+  const triangleLeft = agentIdx === 0 ? "left-[16.6%]" : agentIdx === 1 ? "left-1/2" : "left-[83.3%]";
+
+  return (
+    <div className="relative mt-1">
+      {/* 말풍선 꼭지 */}
+      <div className={`absolute -top-2.5 ${triangleLeft} -translate-x-1/2 w-5 h-5 rotate-45 bg-white dark:bg-slate-800 border-t border-l border-gray-100 dark:border-slate-700`} />
+      <div className="card p-5 relative">
+        <p className="text-gray-900 dark:text-slate-100 text-[15px] leading-relaxed">
+          {displayed}
+          {!done && (
+            <span className="inline-block w-0.5 h-4 bg-gray-400 dark:bg-slate-400 ml-0.5 animate-pulse align-middle" />
+          )}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -246,101 +398,76 @@ export default function InterviewSession({ name }: { name: string }) {
   }
 
   // 면접 진행
-  const isAnswered = messages[messages.length - 1]?.role === "candidate";
   const lastInterviewerIdx = messages.reduce((acc, m, i) => (m.role === "interviewer" ? i : acc), -1);
+  const isAnswered = messages[messages.length - 1]?.role === "candidate";
   const currentQuestion = isAnswered ? "" : (messages[lastInterviewerIdx]?.content ?? "");
   const currentQuestionAgentId = isAnswered ? undefined : messages[lastInterviewerIdx]?.agentId;
-  const pastMessages = isAnswered ? messages : messages.slice(0, lastInterviewerIdx);
+
+  // 이전 Q&A 교환 (현재 질문 제외)
+  const historyPairs: { question: string; agentId: AgentId; answer?: string }[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const m = messages[i];
+    if (m.role === "interviewer") {
+      const next = messages[i + 1];
+      if (next?.role === "candidate") {
+        historyPairs.push({ question: m.content, agentId: m.agentId!, answer: next.content });
+        i += 2;
+      } else {
+        // 현재 질문(답변 전) — 패널에서 표시하므로 히스토리에 포함 안 함
+        i++;
+      }
+    } else {
+      i++;
+    }
+  }
 
   const isTimeWarning = timeLeft <= 30 && timeLeft > 0;
   const isTimeUp = timeLeft === 0;
+  const isSpeaking = !!currentQuestion && !isLoading;
 
   return (
     <div className="space-y-4">
-      {/* 진행 상황 */}
-      <div className="flex items-center gap-2">
-        {AGENT_ORDER.map((aid, i) => {
-          const isDoneAgent = i < agentIndex;
-          const isCurrentAgent = i === agentIndex;
-          const colorMap: Record<AgentId, string> = {
-            organization: "bg-purple-500",
-            logic: "bg-blue-500",
-            technical: "bg-green-500",
-          };
-          const dimMap: Record<AgentId, string> = {
-            organization: "bg-purple-200 dark:bg-purple-900/40",
-            logic: "bg-blue-200 dark:bg-blue-900/40",
-            technical: "bg-green-200 dark:bg-green-900/40",
-          };
-          return (
-            <div key={aid} className="flex-1 space-y-1">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  isDoneAgent
-                    ? colorMap[aid]
-                    : isCurrentAgent
-                      ? dimMap[aid]
-                      : "bg-gray-200 dark:bg-slate-700"
-                }`}
-              />
-              <p
-                className={`text-xs text-center truncate ${
-                  isCurrentAgent
-                    ? "font-semibold text-gray-700 dark:text-slate-300"
-                    : "text-gray-400 dark:text-slate-600"
-                }`}
-              >
-                {AGENTS[aid].label}
-              </p>
-            </div>
-          );
-        })}
-      </div>
+      {/* 면접관 패널 */}
+      <InterviewerPanel agentIndex={agentIndex} isLoading={isLoading} isSpeaking={isSpeaking} />
 
-      {/* 이전 대화 */}
-      {pastMessages.length > 0 && (
-        <div className="space-y-3">
-          {pastMessages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "candidate" ? "justify-end" : "justify-start"}`}>
-              {m.role === "interviewer" && (
-                <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[75%]">
-                  {m.agentId && <AgentBadge agentId={m.agentId} />}
-                  <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed shadow-card">
-                    {m.content}
+      {/* 현재 질문 말풍선 */}
+      {currentQuestion && currentQuestionAgentId && (
+        <QuestionBubble agentId={currentQuestionAgentId} question={currentQuestion} />
+      )}
+
+      {/* 이전 대화 기록 */}
+      {historyPairs.length > 0 && (
+        <details className="group">
+          <summary className="text-xs text-gray-400 dark:text-slate-500 cursor-pointer select-none list-none flex items-center gap-1 px-1">
+            <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+            이전 대화 {historyPairs.length}개
+          </summary>
+          <div className="mt-2 space-y-3 pl-1">
+            {historyPairs.map((pair, idx) => {
+              const pairMeta = AGENT_META[pair.agentId];
+              return (
+                <div key={idx} className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 mt-0.5">
+                      <img src={pairMeta.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl rounded-tl-sm px-3 py-2 text-sm text-gray-700 dark:text-slate-300 leading-relaxed shadow-card flex-1">
+                      {pair.question}
+                    </div>
                   </div>
+                  {pair.answer && (
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-3 py-2 text-sm leading-relaxed shadow-sm">
+                        {pair.answer}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {m.role === "candidate" && (
-                <div className="max-w-[85%] sm:max-w-[75%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed shadow-sm">
-                  {m.content}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 현재 질문 */}
-      {currentQuestion && (
-        <div className="card border-blue-100 dark:border-blue-900/50 p-5 space-y-1">
-          {currentQuestionAgentId && <AgentBadge agentId={currentQuestionAgentId} />}
-          <p className="text-gray-900 dark:text-slate-100 text-base leading-relaxed pt-1">
-            {currentQuestion}
-          </p>
-        </div>
-      )}
-
-      {/* 로딩 */}
-      {isLoading && (
-        <div className="flex justify-start">
-          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl rounded-tl-sm px-4 py-3 shadow-card">
-            <div className="flex gap-1 items-center">
-              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
-            </div>
+              );
+            })}
           </div>
-        </div>
+        </details>
       )}
 
       {/* 오류 */}
