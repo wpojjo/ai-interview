@@ -101,11 +101,12 @@ URL 입력
   → 논리 전문가: 경험기반 질문 (+ 꼬리질문)
   → 기술 전문가: 직무역량 질문 (+ 꼬리질문)
   → POST /api/interview/debate → sessionId 즉시 반환 (fire-and-forget)
-       Round 0: 3 에이전트 병렬 독립 평가 (Promise.allSettled)
-       Round 1: 3 에이전트 병렬 상호 반론 + 점수 재조정
-       중재자: Round 1 revisedScore 평균 → 최종 점수
+       Round 0: 3 에이전트 순차 독립 평가 (완료 즉시 DB 저장)
+       Round 1: 3 에이전트 순차 상호 반론 (완료 즉시 DB 저장)
+       중재자: 최종 점수 · 종합 피드백 · 개선 포인트 생성
   → 클라이언트 1.5초 폴링 (GET /api/interview/debate/[sessionId]/status)
-  → 결과 화면: 최종 점수 · 에이전트별 평가 · 토론 요약 · 개선 포인트
+  → 토론 채팅 UI: 에이전트 의견을 말풍선으로 순차 실시간 노출
+  → "최종 평가 보기" 버튼 → 결과 화면: 최종 점수 · 에이전트별 평가 · 토론 요약 · 개선 포인트
 ```
 
 ---
