@@ -265,6 +265,10 @@ export default function InterviewSession({ name }: { name: string }) {
     history.pushState({ interviewPhase: "interviewing" }, "");
   }
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   function goToPhase(next: Phase) {
     setPhase(next);
     if (next !== "selecting") {
