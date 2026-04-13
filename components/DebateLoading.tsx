@@ -403,11 +403,6 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
         <div ref={bottomRef} />
       </div>
 
-      {isActive && (
-        <p className="text-xs text-gray-400 dark:text-slate-500 text-center">
-          Ollama 모델에 따라 1~3분 소요될 수 있습니다
-        </p>
-      )}
 
       {showProceedButton && pendingResult.current && (
         <button
