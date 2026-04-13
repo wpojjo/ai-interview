@@ -265,14 +265,6 @@ export default function InterviewSession({ name }: { name: string }) {
     history.pushState({ interviewPhase: "interviewing" }, "");
   }
 
-  useEffect(() => {
-    if ("scrollRestoration" in history) {
-      history.scrollRestoration = "manual";
-    }
-    window.scrollTo(0, 0);
-    const t = setTimeout(() => window.scrollTo(0, 0), 100);
-    return () => clearTimeout(t);
-  }, []);
 
   function goToPhase(next: Phase) {
     setPhase(next);
