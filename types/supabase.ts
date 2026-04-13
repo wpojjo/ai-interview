@@ -92,19 +92,19 @@ export type Database = {
       }
       certifications: {
         Row: {
-          acquiredDate: string
+          grade: string | null
           id: string
           name: string
           profileId: string
         }
         Insert: {
-          acquiredDate: string
+          grade?: string | null
           id: string
           name: string
           profileId: string
         }
         Update: {
-          acquiredDate?: string
+          grade?: string | null
           id?: string
           name?: string
           profileId?: string

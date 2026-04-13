@@ -26,7 +26,7 @@ export const careerSchema = z.object({
 export const certificationSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "자격증명을 입력해주세요"),
-  acquiredDate: z.string().min(1, "취득일을 입력해주세요"),
+  grade: z.string().optional(),
 });
 
 export const activitySchema = z.object({

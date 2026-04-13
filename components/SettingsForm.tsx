@@ -26,7 +26,7 @@ interface Career {
 interface Certification {
   id?: string;
   name: string;
-  acquiredDate: string;
+  grade?: string | null;
 }
 
 interface Activity {
@@ -53,7 +53,7 @@ function newCareer(): Career {
   return { companyName: "", role: "", startDate: "", endDate: "", description: "" };
 }
 function newCertification(): Certification {
-  return { name: "", acquiredDate: "" };
+  return { name: "", grade: "" };
 }
 function newActivity(): Activity {
   return { title: "", role: "", startDate: "", endDate: "", description: "" };
@@ -155,7 +155,6 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
       {/* 학력 */}
       <Section
         title="학력"
-        icon="🎓"
         count={educations.length}
         onAdd={() => setEducations((p) => [...p, newEducation()])}
       >
@@ -163,7 +162,7 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
           <EmptyState text="학력 정보가 없습니다" />
         ) : educations.map((edu, i) => (
           <ItemCard key={i} onDelete={() => setEducations((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="학교명">
                 <input type="text" value={edu.schoolName} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, schoolName: e.target.value } : item))} placeholder="OO대학교" className="input" />
               </Field>
@@ -194,7 +193,6 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
       {/* 경력 */}
       <Section
         title="경력"
-        icon="💼"
         count={careers.length}
         onAdd={() => setCareers((p) => [...p, newCareer()])}
       >
@@ -202,7 +200,7 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
           <EmptyState text="경력 정보가 없습니다" />
         ) : careers.map((career, i) => (
           <ItemCard key={i} onDelete={() => setCareers((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="회사명">
                 <input type="text" value={career.companyName} onChange={(e) => setCareers((p) => p.map((item, idx) => idx === i ? { ...item, companyName: e.target.value } : item))} placeholder="(주)OO회사" className="input" />
               </Field>
@@ -226,7 +224,6 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
       {/* 자격증 */}
       <Section
         title="자격증"
-        icon="📜"
         count={certifications.length}
         onAdd={() => setCertifications((p) => [...p, newCertification()])}
       >
@@ -234,12 +231,12 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
           <EmptyState text="자격증 정보가 없습니다" />
         ) : certifications.map((cert, i) => (
           <ItemCard key={i} onDelete={() => setCertifications((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="자격증명">
                 <input type="text" value={cert.name} onChange={(e) => setCertifications((p) => p.map((item, idx) => idx === i ? { ...item, name: e.target.value } : item))} placeholder="정보처리기사" className="input" />
               </Field>
-              <Field label="취득일">
-                <input type="month" value={cert.acquiredDate} onChange={(e) => setCertifications((p) => p.map((item, idx) => idx === i ? { ...item, acquiredDate: e.target.value } : item))} className="input" />
+              <Field label="등급 / 점수 (선택)">
+                <input type="text" value={cert.grade ?? ""} onChange={(e) => setCertifications((p) => p.map((item, idx) => idx === i ? { ...item, grade: e.target.value } : item))} placeholder="예) 1급, 900점" className="input" />
               </Field>
             </div>
           </ItemCard>
@@ -249,7 +246,6 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
       {/* 대외활동 */}
       <Section
         title="대외활동"
-        icon="🌐"
         count={activities.length}
         onAdd={() => setActivities((p) => [...p, newActivity()])}
       >
@@ -257,7 +253,7 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
           <EmptyState text="대외활동 정보가 없습니다" />
         ) : activities.map((act, i) => (
           <ItemCard key={i} onDelete={() => setActivities((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="활동명">
                 <input type="text" value={act.title} onChange={(e) => setActivities((p) => p.map((item, idx) => idx === i ? { ...item, title: e.target.value } : item))} placeholder="UX 스터디" className="input" />
               </Field>
@@ -366,13 +362,11 @@ export default function SettingsForm({ initialData }: { initialData: InitialData
 
 function Section({
   title,
-  icon,
   count,
   onAdd,
   children,
 }: {
   title: string;
-  icon: string;
   count: number;
   onAdd: () => void;
   children: React.ReactNode;
@@ -381,7 +375,6 @@ function Section({
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
         <div className="flex items-center gap-2.5">
-          <span className="text-base">{icon}</span>
           <span className="font-semibold text-gray-800 dark:text-slate-100">{title}</span>
           {count > 0 && (
             <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">

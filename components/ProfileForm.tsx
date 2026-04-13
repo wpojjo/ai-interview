@@ -25,7 +25,7 @@ interface Career {
 interface Certification {
   id?: string;
   name: string;
-  acquiredDate: string;
+  grade?: string | null;
 }
 
 interface Activity {
@@ -52,7 +52,7 @@ function newCareer(): Career {
   return { companyName: "", role: "", startDate: "", endDate: "", description: "" };
 }
 function newCertification(): Certification {
-  return { name: "", acquiredDate: "" };
+  return { name: "", grade: "" };
 }
 function newActivity(): Activity {
   return { title: "", role: "", startDate: "", endDate: "", description: "" };
@@ -195,12 +195,12 @@ export default function ProfileForm({ name, initialData }: { name: string; initi
           <EmptyState text="자격증 정보가 없습니다" />
         ) : certifications.map((cert, i) => (
           <ItemCard key={i} onDelete={() => setCertifications((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="자격증명">
                 <input type="text" value={cert.name} onChange={(e) => setCertifications((p) => p.map((item, idx) => idx === i ? { ...item, name: e.target.value } : item))} placeholder="정보처리기사" className="input" />
               </Field>
-              <Field label="취득일">
-                <input type="month" value={cert.acquiredDate} onChange={(e) => setCertifications((p) => p.map((item, idx) => idx === i ? { ...item, acquiredDate: e.target.value } : item))} className="input" />
+              <Field label="등급 / 점수 (선택)">
+                <input type="text" value={cert.grade ?? ""} onChange={(e) => setCertifications((p) => p.map((item, idx) => idx === i ? { ...item, grade: e.target.value } : item))} placeholder="예) 1급, 900점" className="input" />
               </Field>
             </div>
           </ItemCard>
