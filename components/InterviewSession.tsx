@@ -231,13 +231,14 @@ function InterviewerPanel({
 function QuestionBubble({ agentId, question }: { agentId: AgentId; question: string }) {
   const { displayed, done } = useTypewriter(question);
   const agentIdx = AGENT_ORDER.indexOf(agentId);
-  const triangleLeft = agentIdx === 0 ? "left-[16.6%]" : agentIdx === 1 ? "left-1/2" : "left-[83.3%]";
+  const tailLeft = agentIdx === 0 ? "left-[16.6%]" : agentIdx === 1 ? "left-1/2" : "left-[83.3%]";
+  const meta = AGENT_META[agentId];
 
   return (
-    <div className="relative mt-1">
-      {/* 말풍선 꼭지 */}
-      <div className={`absolute -top-2.5 ${triangleLeft} -translate-x-1/2 w-5 h-5 rotate-45 bg-white dark:bg-slate-800 border-t border-l border-gray-100 dark:border-slate-700`} />
-      <div className="card p-5 relative">
+    <div className="relative mt-2">
+      {/* 위를 향하는 말풍선 꼭지 */}
+      <div className={`absolute -top-3 ${tailLeft} -translate-x-1/2 w-5 h-5 rotate-45 bg-white dark:bg-slate-800 border-t border-l ${meta.border}`} />
+      <div className={`card p-5 relative border ${meta.border}`}>
         <p className="text-gray-900 dark:text-slate-100 text-[15px] leading-relaxed">
           {displayed}
           {!done && (
@@ -264,7 +265,7 @@ function AgentThoughtCard({
   onDone: () => void;
 }) {
   const meta = AGENT_META[agentId];
-  const fullText = [thought.reaction, thought.judgment, thought.curiosity].filter(Boolean).join(" ");
+  const fullText = thought.reaction || "";
   const { displayed, done } = useTypewriter(fullText, 14);
 
   const onDoneRef = useRef(onDone);
@@ -279,25 +280,33 @@ function AgentThoughtCard({
   }, [done]);
 
   return (
-    <div
-      className={`rounded-2xl p-3 border-2 transition-all duration-300 ${
-        isSelected
-          ? `bg-white dark:bg-slate-800 ${meta.border} shadow-md`
-          : "bg-gray-50 dark:bg-slate-800/40 border-transparent opacity-50"
-      }`}
-    >
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0">
-          <img src={makeAvatarUrl(avatarSeed, meta.bgColor)} alt={meta.name} className="w-full h-full object-cover" />
+    <div className="relative pb-3">
+      <div
+        className={`rounded-2xl p-3 border-2 transition-all duration-300 ${
+          isSelected
+            ? `bg-white dark:bg-slate-800 ${meta.border} shadow-md`
+            : "bg-gray-50 dark:bg-slate-800/40 border-transparent opacity-40"
+        }`}
+      >
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <div className="w-5 h-5 rounded-full overflow-hidden shrink-0">
+            <img src={makeAvatarUrl(avatarSeed, meta.bgColor)} alt={meta.name} className="w-full h-full object-cover" />
+          </div>
+          <span className={`text-[11px] font-semibold ${meta.color}`}>{meta.name}</span>
         </div>
-        <span className={`text-[11px] font-semibold ${meta.color}`}>{meta.name}</span>
+        <p className="text-gray-500 dark:text-slate-400 text-[12px] leading-relaxed italic">
+          {displayed}
+          {!done && (
+            <span className="inline-block w-0.5 h-3 bg-gray-300 dark:bg-slate-600 ml-0.5 animate-pulse align-middle" />
+          )}
+        </p>
       </div>
-      <p className="text-gray-400 dark:text-slate-500 text-[12px] leading-relaxed italic">
-        💭 {displayed}
-        {!done && (
-          <span className="inline-block w-0.5 h-3 bg-gray-300 dark:bg-slate-600 ml-0.5 animate-pulse align-middle" />
-        )}
-      </p>
+      {/* 아래를 향하는 말풍선 꼭지 */}
+      <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 transition-all duration-300 ${
+        isSelected
+          ? `bg-white dark:bg-slate-800 border-b border-r ${meta.border}`
+          : "bg-gray-50 dark:bg-slate-800/40"
+      }`} />
     </div>
   );
 }

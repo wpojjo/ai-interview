@@ -224,6 +224,15 @@ ${profileSummary}
 ${contextualHints}`;
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")  // **굵게** → 굵게
+    .replace(/\*(.+?)\*/g, "$1")       // *기울임* → 기울임
+    .replace(/^#+\s*/gm, "")           // # 제목 → 제목
+    .replace(/^["'"']+|["'"']+$/g, "") // 앞뒤 따옴표 제거
+    .trim();
+}
+
 async function callOllama(systemPrompt: string, userContent: string, json = false): Promise<string> {
   const body: Record<string, unknown> = {
     model: OLLAMA_MODEL,
@@ -351,9 +360,9 @@ STAR, S, T, A, R 같은 영어 약어를 출력에 사용하지 마세요.`,
     if (!match) throw new Error("no JSON");
     const parsed = JSON.parse(match[0]) as { question: string; hint: string; thought?: string };
     const qRaw = typeof parsed.question === "string" ? parsed.question : "";
-    const question = qRaw.replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "").trim();
-    const hint = typeof parsed.hint === "string" ? parsed.hint : "";
-    const thought = typeof parsed.thought === "string" ? parsed.thought : undefined;
+    const question = stripMarkdown(qRaw.replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, ""));
+    const hint = typeof parsed.hint === "string" ? stripMarkdown(parsed.hint) : "";
+    const thought = typeof parsed.thought === "string" ? stripMarkdown(parsed.thought) : undefined;
     if (question) return { question, hint, thought };
     throw new Error("empty question");
   } catch {
@@ -363,12 +372,12 @@ STAR, S, T, A, R 같은 영어 약어를 출력에 사용하지 마세요.`,
     const tMatch = raw.match(/"thought"\s*:\s*"((?:[^"\\]|\\.)*)"/);
     if (qMatch?.[1]) {
       return {
-        question: qMatch[1].replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "").trim(),
-        hint: hMatch?.[1] ?? "",
-        thought: tMatch?.[1],
+        question: stripMarkdown(qMatch[1].replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "")),
+        hint: hMatch?.[1] ? stripMarkdown(hMatch[1]) : "",
+        thought: tMatch?.[1] ? stripMarkdown(tMatch[1]) : undefined,
       };
     }
-    return { question: raw.replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "").trim(), hint: "" };
+    return { question: stripMarkdown(raw.replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "")), hint: "" };
   }
 }
 
@@ -407,20 +416,43 @@ const AGENT_THOUGHT_PERSONA: Record<AgentId, string> = {
 판단 철학: "이 사람, 같이 일하면 좋은가? 오래 갈 사람인가?"
 성향: 관찰자 스타일. 말의 내용보다 말하는 방식, 태도, 에너지를 더 보는 타입. 조용하고 관찰하는 느낌.
 
-지원자 답변을 들으며 속마음을 솔직하게 드러내세요.
-표현 규칙: 반드시 구어체. 조용하고 관찰하는 톤. 단정 짓지 않고 "~인 것 같은데", "~가 없어 보이네" 식으로. 각 항목 1~2문장. 분석 투 금지.`,
+지원자 답변을 들으며 속마음을 드러내세요.
+
+[표현 규칙]
+- 보고서·피드백이 아닌 머릿속 혼잣말
+- ~습니다/~합니다 절대 금지. ~네, ~겠어, ~인 것 같은데, ~가 없어 보이네 사용
+- 각 항목 반드시 한 문장, 20자 내외
+
+나쁜 예: "성장 가능성과 진정성이 있지만, 구체적인 경험 공유가 더 필요해 보입니다."
+좋은 예: "진정성은 있는데 구체적인 얘기가 없네."`,
+
   logic: `당신은 [논리전문가] 면접관입니다.
 판단 철학: "이건 사실인가? 논리적으로 성립하는가?"
 성향: 냉정한 검사 스타일. 말을 들으면서 바로 "이게 말이 되나?"를 따지는 타입. 의심이 기본값.
 
-지원자 답변을 들으며 속마음을 솔직하게 드러내세요.
-표현 규칙: 반드시 구어체. 짧고 날카롭게. 각 항목 1~2문장. 분석 투 금지. 답변의 특정 표현 인용 권장.`,
+지원자 답변을 들으며 속마음을 드러내세요.
+
+[표현 규칙]
+- 보고서·피드백이 아닌 머릿속 혼잣말
+- ~습니다/~합니다 절대 금지. ~네, ~겠어, ~인지 모르겠어, ~가 수상해 사용
+- 각 항목 반드시 한 문장, 20자 내외. 답변의 특정 표현 인용 권장
+
+나쁜 예: "샤프지수 검증 사례가 부족해 보이며 객관적 비교가 필요합니다."
+좋은 예: "'8% 높게 나왔다'는 말, 비교 기간이 뭔데?"`,
+
   technical: `당신은 [기술전문가] 면접관입니다.
 판단 철학: "그래서 이 사람, 내일 당장 써먹을 수 있냐?"
 성향: 실용주의자. 건조하고 실무적. 감정보다 판단.
 
-지원자 답변을 들으며 속마음을 솔직하게 드러내세요.
-표현 규칙: 반드시 구어체. 건조하고 실무적. 각 항목 1~2문장. 분석 투 금지.`,
+지원자 답변을 들으며 속마음을 드러내세요.
+
+[표현 규칙]
+- 보고서·피드백이 아닌 머릿속 혼잣말
+- ~습니다/~합니다 절대 금지. ~네, ~겠어, ~가 없잖아, ~는 알겠어 사용
+- 각 항목 반드시 한 문장, 20자 내외
+
+나쁜 예: "구체적인 스킬셋 설명이 부족하며 실무 수행 능력 평가가 어렵습니다."
+좋은 예: "pandas 썼다는데 실제로 짤 수 있는 건지 모르겠네."`,
 };
 
 async function generateSingleAgentThought(
@@ -460,14 +492,14 @@ ${conversationText}
 
 다음 JSON 형식으로 응답하세요:
 {
-  "reaction": "<듣는 순간 반응. 구어체 1~2문장>",
-  "judgment": "<머릿속 판단. 1문장>",
-  "curiosity": "<더 보고 싶은 것. 1문장>",
+  "reaction": "<듣는 순간 첫 반응. 구어체 혼잣말 한 문장>",
+  "judgment": "<머릿속 판단. 구어체 혼잣말 한 문장>",
+  "curiosity": "<더 보고 싶은 것. 구어체 혼잣말 한 문장>",
   "shouldAsk": <꼬리질문이 필요하면 true, 아니면 false>,
   "question": "<한국어로 꼬리질문 1개, shouldAsk가 false이면 빈 문자열>",
   "hint": "<좋은 답변이 어떤 모습인지 1-2문장, shouldAsk가 false이면 빈 문자열>"
 }
-문자열 값 안에 마크다운 서식(**, *, #)을 사용하지 마세요.`;
+~습니다/~합니다 사용 금지. 마크다운 서식(**, *, #) 사용 금지.`;
 
   const raw = await callOllama(systemPrompt, userContent, true);
 
@@ -485,13 +517,13 @@ ${conversationText}
     return {
       agentId,
       thought: {
-        reaction: parsed.reaction ?? "",
+        reaction: stripMarkdown(parsed.reaction ?? ""),
         judgment: parsed.judgment ?? "",
         curiosity: parsed.curiosity ?? "",
       },
       shouldAsk: !!parsed.shouldAsk,
-      question: typeof parsed.question === "string" ? parsed.question.trim() : "",
-      hint: typeof parsed.hint === "string" ? parsed.hint : "",
+      question: typeof parsed.question === "string" ? stripMarkdown(parsed.question) : "",
+      hint: typeof parsed.hint === "string" ? stripMarkdown(parsed.hint) : "",
     };
   } catch {
     // Regex fallback
@@ -504,13 +536,13 @@ ${conversationText}
     return {
       agentId,
       thought: {
-        reaction: rMatch?.[1] ?? "",
+        reaction: rMatch?.[1] ? stripMarkdown(rMatch[1]) : "",
         judgment: jMatch?.[1] ?? "",
         curiosity: cMatch?.[1] ?? "",
       },
       shouldAsk: sMatch?.[1] === "true",
-      question: qMatch?.[1]?.trim() ?? "",
-      hint: hMatch?.[1] ?? "",
+      question: qMatch?.[1] ? stripMarkdown(qMatch[1]) : "",
+      hint: hMatch?.[1] ? stripMarkdown(hMatch[1]) : "",
     };
   }
 }
