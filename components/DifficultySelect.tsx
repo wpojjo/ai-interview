@@ -1,6 +1,6 @@
 "use client";
 
-import { Difficulty, MAX_FOLLOWUPS } from "@/lib/interview";
+import { Difficulty } from "@/lib/interview";
 
 const DIFFICULTY_CONFIG: {
   value: Difficulty;
@@ -12,22 +12,22 @@ const DIFFICULTY_CONFIG: {
   {
     value: "easy",
     label: "이지",
-    description: "기본 질문만",
-    detail: `에이전트당 1개 질문 · 총 ${3}문항`,
+    description: "핵심이 빠졌을 때만 꼬리질문",
+    detail: "면접관이 꼭 필요한 경우에만 추가 질문합니다",
     color: "border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600",
   },
   {
     value: "normal",
     label: "노말",
-    description: "꼬리질문 최대 1회",
-    detail: `에이전트당 최대 ${1 + MAX_FOLLOWUPS.normal}개 질문 · 총 최대 ${3 * (1 + MAX_FOLLOWUPS.normal)}문항`,
+    description: "구체성이 부족하면 꼬리질문",
+    detail: "면접관이 사례·근거가 부족하다고 판단하면 파고듭니다",
     color: "border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600",
   },
   {
     value: "hard",
     label: "하드",
-    description: "꼬리질문 최대 3회",
-    detail: `에이전트당 최대 ${1 + MAX_FOLLOWUPS.hard}개 질문 · 총 최대 ${3 * (1 + MAX_FOLLOWUPS.hard)}문항`,
+    description: "모호한 답변엔 항상 꼬리질문",
+    detail: "수치·구체적 사례가 없으면 면접관이 계속 파고듭니다",
     color: "border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600",
   },
 ];

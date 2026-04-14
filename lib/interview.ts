@@ -4,11 +4,7 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:7b";
 export type AgentId = "organization" | "logic" | "technical";
 export type Difficulty = "easy" | "normal" | "hard";
 
-export const MAX_FOLLOWUPS: Record<Difficulty, number> = {
-  easy: 0,
-  normal: 1,
-  hard: 3,
-};
+export const MAX_FOLLOWUP_ROUNDS = 4; // 무한루프 방지용 안전 캡
 
 export const AGENT_ORDER: AgentId[] = ["organization", "logic", "technical"];
 export const TOTAL_AGENTS = AGENT_ORDER.length;
@@ -235,6 +231,7 @@ async function callOllama(systemPrompt: string, userContent: string, json = fals
 export interface QuestionResult {
   question: string;
   hint: string;
+  thought?: string;
 }
 
 const FIRST_QUESTION_HINT = "지원자의 기본 배경과 이 회사·직무에 지원한 이유를 파악하는 질문입니다. 단순한 경력 나열보다는 지원 동기의 진정성과 이 포지션과의 연관성을 구체적으로 전달하세요.";
@@ -280,32 +277,39 @@ STAR, S, T, A, R 같은 영어 약어를 출력에 사용하지 마세요.`,
     ? `[지금까지의 면접 대화]\n${conversationText}\n\n${baseQuestionGuide[agentId]}`
     : baseQuestionGuide[agentId];
 
+  const thoughtField = difficulty !== "hard"
+    ? `,\n  "thought": "<이 지원자에게 이 질문을 선택한 이유를 면접관의 내부 독백으로 1문장. 지원자의 프로필이나 이전 답변에서 구체적인 근거를 언급하세요. 예: '경력 전환 이유가 아직 불분명해. 더 파봐야겠어.' '직무 요건에 있는 기술 경험을 아직 확인 못 했네.' 지원자에게는 들리지 않는 생각입니다.>"`
+    : "";
+
   const userContent = `${guide}
 
 다음 JSON 형식으로 응답하세요 (다른 텍스트 없이):
 {
   "question": "<한국어로 면접 질문 정확히 하나 — '면접관:' 또는 'Q:' 같은 접두사 없이>",
-  "hint": "<좋은 답변이 어떤 모습인지 1-2문장으로 안내하세요. 형식이나 내용을 구체적으로 알려주세요. 예: '구체적인 상황과 본인이 직접 취한 행동, 그리고 결과까지 포함해서 답변해주세요.' '논리력을 평가합니다' 같은 추상적 표현은 사용하지 마세요.>"
+  "hint": "<좋은 답변이 어떤 모습인지 1-2문장으로 안내하세요. 형식이나 내용을 구체적으로 알려주세요. 예: '구체적인 상황과 본인이 직접 취한 행동, 그리고 결과까지 포함해서 답변해주세요.' '논리력을 평가합니다' 같은 추상적 표현은 사용하지 마세요.>"${thoughtField}
 }`;
 
   const raw = await callOllama(systemPrompt, userContent, true);
   try {
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("no JSON");
-    const parsed = JSON.parse(match[0]) as { question: string; hint: string };
+    const parsed = JSON.parse(match[0]) as { question: string; hint: string; thought?: string };
     const qRaw = typeof parsed.question === "string" ? parsed.question : "";
     const question = qRaw.replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "").trim();
     const hint = typeof parsed.hint === "string" ? parsed.hint : "";
-    if (question) return { question, hint };
+    const thought = typeof parsed.thought === "string" ? parsed.thought : undefined;
+    if (question) return { question, hint, thought };
     throw new Error("empty question");
   } catch {
     // Regex fallback: extract "question" value directly from raw string
     const qMatch = raw.match(/"question"\s*:\s*"((?:[^"\\]|\\.)*)"/);
     const hMatch = raw.match(/"hint"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const tMatch = raw.match(/"thought"\s*:\s*"((?:[^"\\]|\\.)*)"/);
     if (qMatch?.[1]) {
       return {
         question: qMatch[1].replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "").trim(),
         hint: hMatch?.[1] ?? "",
+        thought: tMatch?.[1],
       };
     }
     return { question: raw.replace(/^(면접관|질문|interviewer|question)\s*:\s*/i, "").trim(), hint: "" };
@@ -314,8 +318,8 @@ STAR, S, T, A, R 같은 영어 약어를 출력에 사용하지 마세요.`,
 
 const DIFFICULTY_FOLLOWUP_HINT: Record<Difficulty, string> = {
   easy: "핵심을 완전히 빠뜨린 경우에만 shouldFollowUp을 true로 설정하세요.",
-  normal: "구체적인 사례나 핵심 내용이 부족해서 지원자를 공정하게 평가하기 어렵다면 shouldFollowUp을 true로 설정하세요.",
-  hard: "구체적인 수치, 프로젝트명, 명확한 깊이가 포함된 경우에만 shouldFollowUp을 false로 설정하세요. 모호하거나 추상적인 답변은 항상 꼬리질문이 필요합니다.",
+  normal: "구체적인 사례나 핵심 내용이 부족해서 공정한 평가가 어렵다면 shouldFollowUp을 true로 설정하세요.",
+  hard: "수치, 프로젝트명, 구체적 깊이가 포함된 경우에만 shouldFollowUp을 false로 설정하세요. 모호하거나 추상적인 답변은 항상 shouldFollowUp을 true로 설정하세요.",
 };
 
 // 에이전트의 꼬리질문 생성. null 반환 시 다음 에이전트로 넘어감
@@ -338,6 +342,10 @@ export async function generateAgentFollowUpQuestion(
     technical: "수치·프로젝트명을 포함한 기술적 구체성과 측정 가능한 결과",
   };
 
+  const followUpThoughtField = difficulty !== "hard"
+    ? `,\n  "thought": "<답변의 어떤 부분이 부족해서 꼬리질문을 하는지 면접관의 내부 독백으로 1문장. shouldFollowUp이 false이면 빈 문자열. 예: '팀 성과만 말했고 본인 역할이 빠졌어.' '결과를 수치로 말하지 않았네.' 지원자에게는 들리지 않는 생각입니다.>"`
+    : "";
+
   const userContent = `[면접 대화 기록]\n${conversationText}
 
 지원자가 방금 마지막 질문에 답변했습니다. 답변이 당신의 평가 기준을 충분히 충족하는지 판단하세요: ${agentCriteria[agentId]}.
@@ -350,7 +358,7 @@ export async function generateAgentFollowUpQuestion(
 {
   "shouldFollowUp": <답변이 불충분하면 true, 충분하면 false>,
   "question": "<한국어로 꼬리질문, shouldFollowUp이 false이면 빈 문자열>",
-  "hint": "<좋은 답변이 어떤 모습인지 1-2문장으로 안내하세요. 예: '이번엔 본인이 직접 취한 행동과 그 결과를 수치로 말씀해주세요.' shouldFollowUp이 false이면 빈 문자열>"
+  "hint": "<좋은 답변이 어떤 모습인지 1-2문장으로 안내하세요. 예: '이번엔 본인이 직접 취한 행동과 그 결과를 수치로 말씀해주세요.' shouldFollowUp이 false이면 빈 문자열>"${followUpThoughtField}
 }`;
 
   const raw = await callOllama(systemPrompt, userContent, true);
@@ -358,18 +366,23 @@ export async function generateAgentFollowUpQuestion(
   try {
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { shouldFollowUp: boolean; question: string; hint: string };
+    const parsed = JSON.parse(match[0]) as { shouldFollowUp: boolean; question: string; hint: string; thought?: string };
     if (!parsed.shouldFollowUp) return null;
     const q = typeof parsed.question === "string" ? parsed.question.trim() : "";
     if (!q) return null;
-    return { question: q, hint: typeof parsed.hint === "string" ? parsed.hint : "" };
+    return {
+      question: q,
+      hint: typeof parsed.hint === "string" ? parsed.hint : "",
+      thought: typeof parsed.thought === "string" ? parsed.thought : undefined,
+    };
   } catch {
     // Regex fallback
     const followUpMatch = raw.match(/"shouldFollowUp"\s*:\s*(true|false)/);
     if (followUpMatch?.[1] !== "true") return null;
     const qMatch = raw.match(/"question"\s*:\s*"((?:[^"\\]|\\.)*)"/);
     const hMatch = raw.match(/"hint"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const tMatch = raw.match(/"thought"\s*:\s*"((?:[^"\\]|\\.)*)"/);
     if (!qMatch?.[1]) return null;
-    return { question: qMatch[1].trim(), hint: hMatch?.[1] ?? "" };
+    return { question: qMatch[1].trim(), hint: hMatch?.[1] ?? "", thought: tMatch?.[1] };
   }
 }

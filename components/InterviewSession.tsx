@@ -8,7 +8,7 @@ import {
   AGENTS,
   AGENT_ORDER,
   TOTAL_AGENTS,
-  MAX_FOLLOWUPS,
+  MAX_FOLLOWUP_ROUNDS,
   getFirstQuestion,
 } from "@/lib/interview";
 import DifficultySelect from "@/components/DifficultySelect";
@@ -24,7 +24,7 @@ async function fetchQuestion(
   agentId: AgentId,
   isFollowUpRequest: boolean,
   difficulty: Difficulty,
-): Promise<{ question?: string; hint?: string; followUp?: boolean }> {
+): Promise<{ question?: string; hint?: string; thought?: string; followUp?: boolean }> {
   const res = await fetch("/api/interview/question", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -228,11 +228,59 @@ function QuestionBubble({ agentId, question }: { agentId: AgentId; question: str
   );
 }
 
+function ThoughtBubble({
+  thought,
+  visible,
+  onToggle,
+  onDone,
+}: {
+  thought: string;
+  visible: boolean;
+  onToggle: () => void;
+  onDone: () => void;
+}) {
+  const { displayed, done } = useTypewriter(thought, 15);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  const calledRef = useRef(false);
+
+  useEffect(() => {
+    if (!calledRef.current && (done || !visible)) {
+      calledRef.current = true;
+      onDoneRef.current();
+    }
+  }, [done, visible]);
+
+  return (
+    <div className="space-y-2">
+      {visible && (
+        <div className="relative bg-white dark:bg-slate-800 rounded-2xl px-4 py-3 shadow-sm border border-gray-100 dark:border-slate-700/50">
+          {/* 말풍선 아래 꼬리 (패널 방향) */}
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-white dark:bg-slate-800 border-b border-r border-gray-100 dark:border-slate-700/50" />
+          <p className="text-gray-400 dark:text-slate-500 text-[13px] leading-relaxed italic">
+            💭 {displayed}
+            {!done && (
+              <span className="inline-block w-0.5 h-3 bg-gray-300 dark:bg-slate-600 ml-0.5 animate-pulse align-middle" />
+            )}
+          </p>
+        </div>
+      )}
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1 text-[11px] text-gray-300 dark:text-slate-600 hover:text-gray-400 dark:hover:text-slate-400 transition-colors px-1"
+      >
+        <span>{visible ? "▲" : "▼"}</span>
+        <span>면접관의 생각 {visible ? "접기" : "펼치기"}</span>
+      </button>
+    </div>
+  );
+}
+
 export default function InterviewSession({ name }: { name: string }) {
   const [phase, setPhase] = useState<Phase>("selecting");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
   const [agentIndex, setAgentIndex] = useState(0);
-  const [followUpCount, setFollowUpCount] = useState(0);
+  const [followUpRound, setFollowUpRound] = useState(0);
   const [avatarSeeds, setAvatarSeeds] = useState<Record<AgentId, string>>({
     organization: "organization",
     logic: "logic",
@@ -248,6 +296,11 @@ export default function InterviewSession({ name }: { name: string }) {
   const [error, setError] = useState("");
   const [timeLeft, setTimeLeft] = useState(ANSWER_TIME_LIMIT);
 
+  const [currentThought, setCurrentThought] = useState("");
+  const [thoughtVisible, setThoughtVisible] = useState(true);
+  const [questionReady, setQuestionReady] = useState(true);
+  const thoughtTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [debateResult, setDebateResult] = useState<DebateResultData | null>(null);
   const [debateError, setDebateError] = useState("");
@@ -260,7 +313,7 @@ export default function InterviewSession({ name }: { name: string }) {
     setCurrentHint("지원자의 기본 배경과 이 회사·직무에 지원한 이유를 파악하는 질문입니다. 단순한 경력 나열보다는 지원 동기의 진정성과 이 포지션과의 연관성을 구체적으로 전달하세요.");
     setHintVisible(false);
     setAgentIndex(0);
-    setFollowUpCount(0);
+    setFollowUpRound(0);
     setPhase("interviewing");
     history.pushState({ interviewPhase: "interviewing" }, "");
   }
@@ -307,6 +360,21 @@ export default function InterviewSession({ name }: { name: string }) {
     }
   }, [timeLeft, currentHint, hintVisible]);
 
+  function applyThought(thought: string | undefined) {
+    if (thoughtTimerRef.current) {
+      clearTimeout(thoughtTimerRef.current);
+      thoughtTimerRef.current = null;
+    }
+    if (thought && difficulty !== "hard") {
+      setCurrentThought(thought);
+      setThoughtVisible(true);
+      setQuestionReady(false);
+    } else {
+      setCurrentThought("");
+      setQuestionReady(true);
+    }
+  }
+
   async function handleSubmit() {
     const trimmed = answer.trim();
     if (!trimmed || isLoading) return;
@@ -320,10 +388,11 @@ export default function InterviewSession({ name }: { name: string }) {
     setAnswer("");
     setIsLoading(true);
     setError("");
+    setCurrentThought("");
+    setQuestionReady(true);
 
     try {
-      const maxFollowUps = MAX_FOLLOWUPS[difficulty];
-      const canFollowUp = followUpCount < maxFollowUps;
+      const canFollowUp = followUpRound < MAX_FOLLOWUP_ROUNDS;
 
       if (canFollowUp) {
         const result = await fetchQuestion(updatedMessages, currentAgentId, true, difficulty);
@@ -336,7 +405,8 @@ export default function InterviewSession({ name }: { name: string }) {
           ]);
           setCurrentHint(result.hint ?? "");
           setHintVisible(false);
-          setFollowUpCount((c) => c + 1);
+          setFollowUpRound((c) => c + 1);
+          applyThought(result.thought);
         }
       } else {
         await advanceToNextAgent(updatedMessages);
@@ -369,7 +439,8 @@ export default function InterviewSession({ name }: { name: string }) {
       setCurrentHint(result.hint ?? "");
       setHintVisible(false);
       setAgentIndex(nextAgentIndex);
-      setFollowUpCount(0);
+      setFollowUpRound(0);
+      applyThought(result.thought);
     }
   }
 
@@ -377,12 +448,18 @@ export default function InterviewSession({ name }: { name: string }) {
     setPhase("selecting");
     setMessages([]);
     setAgentIndex(0);
-    setFollowUpCount(0);
+    setFollowUpRound(0);
     setAnswer("");
     setTimeLeft(ANSWER_TIME_LIMIT);
     setError("");
     setCurrentHint("");
     setHintVisible(false);
+    setCurrentThought("");
+    setQuestionReady(true);
+    if (thoughtTimerRef.current) {
+      clearTimeout(thoughtTimerRef.current);
+      thoughtTimerRef.current = null;
+    }
     setSessionId(null);
     setDebateResult(null);
     setDebateError("");
@@ -524,11 +601,28 @@ export default function InterviewSession({ name }: { name: string }) {
         <span className="font-medium">면접 진행 중</span>
       </div>
 
+      {/* 면접관 생각 말풍선 (easy/normal, 첫 질문 제외) */}
+      {currentThought && currentQuestionAgentId && (
+        <ThoughtBubble
+          key={currentThought}
+          thought={currentThought}
+          visible={thoughtVisible}
+          onToggle={() => setThoughtVisible((v) => !v)}
+          onDone={() => {
+            if (thoughtTimerRef.current) clearTimeout(thoughtTimerRef.current);
+            thoughtTimerRef.current = setTimeout(() => {
+              setQuestionReady(true);
+              thoughtTimerRef.current = null;
+            }, 600);
+          }}
+        />
+      )}
+
       {/* 면접관 패널 */}
       <InterviewerPanel agentIndex={agentIndex} isLoading={isLoading} isSpeaking={isSpeaking} avatarSeeds={avatarSeeds} />
 
       {/* 현재 질문 말풍선 */}
-      {currentQuestion && currentQuestionAgentId && (
+      {currentQuestion && currentQuestionAgentId && questionReady && (
         <div className="space-y-2">
           <QuestionBubble agentId={currentQuestionAgentId} question={currentQuestion} />
           {/* 힌트 버튼 + 카드 */}

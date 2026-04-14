@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       if (followUp === null) {
         return NextResponse.json({ followUp: false });
       }
-      return NextResponse.json({ question: followUp.question, hint: followUp.hint, followUp: true });
+      return NextResponse.json({ question: followUp.question, hint: followUp.hint, thought: followUp.thought, followUp: true });
     }
 
     const result = await generateAgentBaseQuestion(
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       difficulty ?? "normal",
     );
 
-    return NextResponse.json({ question: result.question, hint: result.hint });
+    return NextResponse.json({ question: result.question, hint: result.hint, thought: result.thought });
   } catch (error) {
     console.error("Interview question error:", error);
     return NextResponse.json(
