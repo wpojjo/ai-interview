@@ -239,6 +239,7 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onProcee
   const [showAllThinking, setShowAllThinking] = useState(false);
   const [showProceedButton, setShowProceedButton] = useState(false);
   const [allDebateMsgsShown, setAllDebateMsgsShown] = useState(false);
+  const currentStatusRef = useRef("evaluating");
 
   const pendingQueue = useRef<ChatMsg[]>([]);
   const queuedReplyCount = useRef(0);
@@ -259,6 +260,7 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onProcee
         const data = await res.json();
 
         setCurrentStatus(data.status);
+        currentStatusRef.current = data.status;
         if (data.agentEvaluations?.length > 0) setAgentEvaluations(data.agentEvaluations);
         if (data.debateReplies?.length > 0) setDebateReplies(data.debateReplies);
         if (data.agentRebuttals?.length > 0) setAgentRebuttals(data.agentRebuttals);
@@ -352,7 +354,8 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onProcee
     const next = pendingQueue.current.shift();
     if (!next) {
       setTypingAgentId(null);
-      setAllDebateMsgsShown(true);
+      const statusDone = debateFinishedRef.current || currentStatusRef.current === "finalizing";
+      if (statusDone) setAllDebateMsgsShown(true);
       if (debateFinishedRef.current) setShowProceedButton(true);
       return;
     }
@@ -386,7 +389,8 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onProcee
           // 다음 메시지 전 짧은 숨 고르기 (300~700ms)
           popTimerRef.current = setTimeout(popNext, 300 + Math.random() * 400);
         } else {
-          setAllDebateMsgsShown(true);
+          const statusDone = debateFinishedRef.current || currentStatusRef.current === "finalizing";
+          if (statusDone) setAllDebateMsgsShown(true);
           if (debateFinishedRef.current) setShowProceedButton(true);
         }
       }, typingDuration);

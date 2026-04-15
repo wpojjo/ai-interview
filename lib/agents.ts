@@ -101,7 +101,7 @@ function buildContextBlock(profile: ProfileContext, jobPosting: JobPostingContex
     jobPosting.requirements ? `자격 요건: ${jobPosting.requirements}` : "",
     jobPosting.preferredQuals ? `우대 사항: ${jobPosting.preferredQuals}` : "",
   ].filter(Boolean);
-  return `[지원자 배경]\n${profileSummary}\n\n[채용 직무]\n${jobParts.join("\n")}`;
+  return `[지원자 배경]\n${profileSummary}\n\n[채용 직무]\n${jobParts.join("\n")}\n\n지원자를 이름으로 부를 때는 반드시 "~님" 형식을 사용하세요. "~씨" 사용 금지.`;
 }
 
 // ── 에이전트별 시스템 프롬프트 ────────────────────────────────────────────

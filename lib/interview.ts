@@ -227,7 +227,9 @@ ${DIFFICULTY_QUESTION_HINT[difficulty]}
 ${profileSummary}
 
 [면접 가이드]
-${contextualHints}`;
+${contextualHints}
+
+지원자를 이름으로 부를 때는 반드시 "~님" 형식을 사용하세요. "~씨" 사용 금지.`;
 }
 
 function stripMarkdown(text: string): string {
