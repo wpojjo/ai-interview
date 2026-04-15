@@ -14,6 +14,15 @@ interface Props {
   onBack: () => void;
 }
 
+function stripMd(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .trim();
+}
+
 const RECOMMEND_STYLE: Record<string, { bg: string; text: string }> = {
   "강력 추천": { bg: "bg-green-100 dark:bg-green-900/40", text: "text-green-700 dark:text-green-300" },
   "추천":     { bg: "bg-blue-100 dark:bg-blue-900/40",  text: "text-blue-700 dark:text-blue-300" },
@@ -145,13 +154,13 @@ export default function DebateResult({
                   <span className="text-gray-400 dark:text-slate-500 text-xs shrink-0">▼</span>
                 </summary>
                 <div className="px-5 pb-5 space-y-3 border-t border-gray-50 dark:border-slate-700/50 pt-4">
-                  <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{e.opinion}</p>
+                  <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{stripMd(e.opinion)}</p>
                   {e.highlights.length > 0 && (
                     <ul className="space-y-1">
                       {e.highlights.map((h, i) => (
                         <li key={i} className="text-xs text-gray-500 dark:text-slate-400 flex gap-1.5">
                           <span className="text-gray-300 dark:text-slate-600 shrink-0">•</span>
-                          {h.replace(/\*\*/g, "")}
+                          {stripMd(h)}
                         </li>
                       ))}
                     </ul>
@@ -173,7 +182,7 @@ export default function DebateResult({
               <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">강점</span>
             </div>
             <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed pl-6">
-              {finalFeedback.strengths}
+              {stripMd(finalFeedback.strengths)}
             </p>
           </div>
           <div className="h-px bg-gray-100 dark:bg-slate-700" />
@@ -183,7 +192,7 @@ export default function DebateResult({
               <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">약점</span>
             </div>
             <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed pl-6">
-              {finalFeedback.weaknesses}
+              {stripMd(finalFeedback.weaknesses)}
             </p>
           </div>
           <div className="h-px bg-gray-100 dark:bg-slate-700" />
@@ -193,7 +202,7 @@ export default function DebateResult({
               <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">핵심 조언</span>
             </div>
             <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed pl-6">
-              {finalFeedback.advice}
+              {stripMd(finalFeedback.advice)}
             </p>
           </div>
         </div>
@@ -209,7 +218,7 @@ export default function DebateResult({
                 <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                   {i + 1}
                 </span>
-                <span className="leading-relaxed">{tip}</span>
+                <span className="leading-relaxed">{stripMd(tip)}</span>
               </li>
             ))}
           </ul>
@@ -224,7 +233,7 @@ export default function DebateResult({
             <span className="text-gray-400 dark:text-slate-500 text-xs">▲</span>
           </summary>
           <div className="px-5 pb-5 border-t border-gray-50 dark:border-slate-700/50 pt-4">
-            <p className="text-sm text-gray-600 dark:text-slate-400 leading-relaxed">{debateSummary}</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400 leading-relaxed">{stripMd(debateSummary)}</p>
           </div>
         </details>
       )}
