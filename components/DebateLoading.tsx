@@ -30,6 +30,15 @@ type ChatMsg = {
   label?: string; // "재반박" 등 라운드 구분 레이블
 };
 
+function stripMd(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .trim();
+}
+
 const AGENT_META: Record<AgentId, { name: string; bgColor: string; color: string; bubble: string }> = {
   organization: {
     name: "면접관 1",
@@ -141,13 +150,13 @@ function EvalCard({
           </div>
         )}
       </div>
-      <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{evalData.opinion}</p>
+      <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{stripMd(evalData.opinion)}</p>
       {evalData.highlights.length > 0 && (
         <ul className="space-y-1">
           {evalData.highlights.map((h, i) => (
             <li key={i} className="text-xs text-gray-500 dark:text-slate-400 flex gap-1.5">
               <span className="text-gray-300 dark:text-slate-600 shrink-0">•</span>
-              {h.replace(/\*\*/g, "")}
+              {stripMd(h)}
             </li>
           ))}
         </ul>
@@ -209,7 +218,7 @@ function ChatBubble({ msg, avatarSeeds }: { msg: ChatMsg; avatarSeeds: Record<Ag
           )}
         </div>
         <div className={`px-4 py-3 rounded-2xl rounded-bl-sm ${meta.bubble}`}>
-          <p className="text-sm text-gray-700 dark:text-slate-200 leading-relaxed">{msg.text}</p>
+          <p className="text-sm text-gray-700 dark:text-slate-200 leading-relaxed">{stripMd(msg.text)}</p>
         </div>
       </div>
     </div>
