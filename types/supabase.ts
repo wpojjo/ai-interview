@@ -163,6 +163,8 @@ export type Database = {
       interview_sessions: {
         Row: {
           agentEvaluations: Json | null
+          agentFinalOpinions: Json | null
+          agentRebuttals: Json | null
           createdAt: string | null
           debateReplies: Json | null
           debateSummary: string | null
@@ -180,6 +182,8 @@ export type Database = {
         }
         Insert: {
           agentEvaluations?: Json | null
+          agentFinalOpinions?: Json | null
+          agentRebuttals?: Json | null
           createdAt?: string | null
           debateReplies?: Json | null
           debateSummary?: string | null
@@ -197,6 +201,8 @@ export type Database = {
         }
         Update: {
           agentEvaluations?: Json | null
+          agentFinalOpinions?: Json | null
+          agentRebuttals?: Json | null
           createdAt?: string | null
           debateReplies?: Json | null
           debateSummary?: string | null
