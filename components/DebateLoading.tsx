@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AgentEvaluation, AgentReply, ModeratorResult } from "@/lib/agents";
+import type { AgentEvaluation, AgentReply, AgentRebuttal, AgentFinalOpinion, ModeratorResult } from "@/lib/agents";
 import type { AgentId } from "@/lib/interview";
 
 export interface DebateResultData {
   agentEvaluations: AgentEvaluation[];
+  agentFinalOpinions: AgentFinalOpinion[];
   finalScore: number;
   finalFeedback: ModeratorResult["overall"] & { recommendLevel?: string };
   debateSummary: string;
@@ -25,6 +26,7 @@ type ChatMsg = {
   text: string;
   stance?: "agree" | "disagree" | "partial";
   targetName?: string;
+  label?: string; // "재반박" 등 라운드 구분 레이블
 };
 
 const AGENT_META: Record<AgentId, { name: string; bgColor: string; color: string; bubble: string }> = {
@@ -194,7 +196,12 @@ function ChatBubble({ msg, avatarSeeds }: { msg: ChatMsg; avatarSeeds: Record<Ag
               → {msg.targetName}에게
             </span>
           )}
-          {msg.stance && (
+          {msg.label && (
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700">
+              {msg.label}
+            </span>
+          )}
+          {!msg.label && msg.stance && (
             <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${STANCE_LABEL[msg.stance]?.color}`}>
               {STANCE_LABEL[msg.stance]?.label}
             </span>
@@ -213,6 +220,7 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
   const [currentStatus, setCurrentStatus] = useState("evaluating");
   const [agentEvaluations, setAgentEvaluations] = useState<AgentEvaluation[]>([]);
   const [debateReplies, setDebateReplies] = useState<AgentReply[]>([]);
+  const [agentRebuttals, setAgentRebuttals] = useState<AgentRebuttal[]>([]);
   const [viewPhase, setViewPhase] = useState<"evaluating" | "debating">("evaluating");
 
   const [visibleMsgs, setVisibleMsgs] = useState<ChatMsg[]>([]);
@@ -221,6 +229,7 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
 
   const pendingQueue = useRef<ChatMsg[]>([]);
   const queuedReplyCount = useRef(0);
+  const queuedRebuttalCount = useRef(0);
   const transitionStarted = useRef(false);
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const pollRef = useRef<ReturnType<typeof setInterval>>();
@@ -239,11 +248,13 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
         setCurrentStatus(data.status);
         if (data.agentEvaluations?.length > 0) setAgentEvaluations(data.agentEvaluations);
         if (data.debateReplies?.length > 0) setDebateReplies(data.debateReplies);
+        if (data.agentRebuttals?.length > 0) setAgentRebuttals(data.agentRebuttals);
 
         if (data.status === "done") {
           clearInterval(pollRef.current);
           pendingResult.current = {
             agentEvaluations: data.agentEvaluations ?? [],
+            agentFinalOpinions: data.agentFinalOpinions ?? [],
             finalScore: data.finalScore ?? 0,
             finalFeedback: data.finalFeedback ?? { strengths: "", weaknesses: "", advice: "" },
             debateSummary: data.debateSummary ?? "",
@@ -291,6 +302,28 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onError 
     scheduleNext();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateReplies]);
+
+  // 재반박 → 큐 추가 (Round 2)
+  useEffect(() => {
+    if (agentRebuttals.length <= queuedRebuttalCount.current) return;
+
+    const newRebuttals = agentRebuttals.slice(queuedRebuttalCount.current);
+    newRebuttals.forEach((r) => {
+      r.rebuttals.forEach((rb, i) => {
+        const fromMeta = AGENT_META[rb.fromAgentId as AgentId];
+        pendingQueue.current.push({
+          id: `rebuttal-${r.agentId}-${rb.fromAgentId}-${i}`,
+          agentId: r.agentId,
+          text: rb.comment,
+          label: "재반박",
+          targetName: fromMeta?.name ?? rb.fromAgentId,
+        });
+      });
+    });
+    queuedRebuttalCount.current = agentRebuttals.length;
+    scheduleNext();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentRebuttals]);
 
   function scheduleNext() {
     if (popTimerRef.current) return;

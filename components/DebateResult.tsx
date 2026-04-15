@@ -1,11 +1,12 @@
 "use client";
 
-import type { AgentEvaluation } from "@/lib/agents";
+import type { AgentEvaluation, AgentFinalOpinion } from "@/lib/agents";
 import type { AgentId } from "@/lib/interview";
 
 interface Props {
   finalScore: number;
   agentEvaluations: AgentEvaluation[];
+  agentFinalOpinions?: AgentFinalOpinion[];
   finalFeedback: { strengths: string; weaknesses: string; advice: string; recommendLevel?: string };
   debateSummary: string;
   improvementTips: string[];
@@ -83,12 +84,17 @@ const AGENT_COLORS: Record<AgentId, { border: string; badge: string }> = {
 export default function DebateResult({
   finalScore,
   agentEvaluations,
+  agentFinalOpinions,
   finalFeedback,
   debateSummary,
   improvementTips,
   onRestart,
   onBack,
 }: Props) {
+  // 최종 의견이 있으면 최종 의견 기준으로 표시, 없으면 Round 0 평가 사용
+  const displayEvaluations: (AgentEvaluation | AgentFinalOpinion)[] =
+    agentFinalOpinions && agentFinalOpinions.length > 0 ? agentFinalOpinions : agentEvaluations;
+  const isFinalOpinion = agentFinalOpinions && agentFinalOpinions.length > 0;
   return (
     <div className="space-y-6">
       {/* 뒤로가기 */}
@@ -114,11 +120,13 @@ export default function DebateResult({
         })()}
       </div>
 
-      {/* 면접관별 평가 — 아코디언 */}
-      {agentEvaluations.length > 0 && (
+      {/* 면접관별 평가 — 아코디언 (최종 의견 있으면 최종 의견 표시) */}
+      {displayEvaluations.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-bold text-gray-900 dark:text-slate-50 px-1">면접관별 평가</h3>
-          {agentEvaluations.map((e) => {
+          <h3 className="font-bold text-gray-900 dark:text-slate-50 px-1">
+            {isFinalOpinion ? "면접관 최종 의견" : "면접관별 평가"}
+          </h3>
+          {displayEvaluations.map((e) => {
             const colors = AGENT_COLORS[e.agentId] ?? AGENT_COLORS.organization;
             return (
               <details key={e.agentId} className={`card border-l-4 ${colors.border} group`}>

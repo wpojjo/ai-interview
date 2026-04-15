@@ -23,6 +23,27 @@ export interface AgentReply {
   }[];
 }
 
+// Round 2: 에이전트가 자신에 대한 피드백에 재반박
+export interface AgentRebuttal {
+  agentId: AgentId;
+  agentLabel: string;
+  rebuttals: {
+    fromAgentId: string;
+    comment: string;
+  }[];
+}
+
+// Round 3: 토론 전체를 반영한 최종 의견 (Round 0과 동일 형식)
+export interface AgentFinalOpinion {
+  agentId: AgentId;
+  agentLabel: string;
+  criterion: string;
+  opinion: string;
+  highlights: string[];
+  verdict?: string;
+  verdictLabel?: string;
+}
+
 export interface ModeratorResult {
   score: number;
   recommendLevel: "강력 추천" | "추천" | "보류" | "비추천";
@@ -357,11 +378,209 @@ ${replySchema}
   };
 }
 
-// ── 중재자: 최종 종합 ────────────────────────────────────────────────────
+// ── Round 2: 재반박 ──────────────────────────────────────────────────────
+
+export async function generateAgentRebuttal(
+  agentId: AgentId,
+  myEvaluation: AgentEvaluation,
+  repliesAboutMe: { fromAgentId: string; fromAgentLabel: string; stance: string; comment: string }[],
+  messages: Message[],
+  profile: ProfileContext,
+  jobPosting: JobPostingContext,
+): Promise<AgentRebuttal> {
+  const agent = AGENTS[agentId];
+  const conversationText = buildConversationText(messages);
+  const contextBlock = buildContextBlock(profile, jobPosting);
+
+  const feedbackText = repliesAboutMe
+    .map((r) => `[${r.fromAgentLabel}] [${r.stance}]: ${r.comment}`)
+    .join("\n\n");
+
+  const rebuttalSchema = repliesAboutMe
+    .map((r) =>
+      `    {\n      "fromAgentId": "${r.fromAgentId}",\n      "comment": "<${r.fromAgentLabel}의 피드백 특정 문장을 인용한 뒤, 수용할 부분은 왜 수용하는지, 반박할 부분은 당신 기준으로 왜 틀렸는지 3문장 이내로>"\n    }`
+    )
+    .join(",\n");
+
+  const systemPrompt = `당신은 ${agent.label}입니다. 동료들이 당신의 평가에 피드백을 줬습니다. 이제 직접 응답할 차례입니다.
+당신의 평가 기준: ${agent.criterion}.
+- 수용할 부분이 있으면 왜 수용하는지 밝히세요.
+- 반박할 부분은 당신 기준을 근거로 반박하고, 반드시 피드백의 특정 문장을 인용하세요.
+- 각 응답은 3문장 이내로 간결하게 작성하세요. 서론, 요약, 맺음말 없이 바로 시작하세요.
+반드시 유효한 JSON만 응답하세요 — 다른 텍스트 없이.`;
+
+  const userContent = `${contextBlock}
+
+[면접 대화 기록]
+${conversationText}
+
+[나의 Round 0 평가]
+${myEvaluation.opinion}
+
+[나에 대한 피드백]
+${feedbackText}
+
+위 피드백에 직접 응답하세요.
+
+다음 JSON 형식으로 응답하세요:
+{
+  "rebuttals": [
+${rebuttalSchema}
+  ]
+}
+문자열 값 안에 마크다운 서식(**, *, #)을 사용하지 마세요.`;
+
+  const raw = await callOllama(systemPrompt, userContent);
+  const parsed = extractJSON<{
+    rebuttals: { fromAgentId: string; comment: string }[];
+  }>(raw);
+
+  return {
+    agentId,
+    agentLabel: agent.label,
+    rebuttals: (parsed.rebuttals ?? []).map((r) => ({
+      fromAgentId: r.fromAgentId,
+      comment: r.comment,
+    })),
+  };
+}
+
+// ── Round 3: 최종 의견 ───────────────────────────────────────────────────
+
+export async function generateAgentFinalOpinion(
+  agentId: AgentId,
+  myEvaluation: AgentEvaluation,
+  repliesAboutMe: { fromAgentLabel: string; stance: string; comment: string }[],
+  myRebuttal: AgentRebuttal | undefined,
+  messages: Message[],
+  profile: ProfileContext,
+  jobPosting: JobPostingContext,
+): Promise<AgentFinalOpinion> {
+  const agent = AGENTS[agentId];
+  const conversationText = buildConversationText(messages);
+  const contextBlock = buildContextBlock(profile, jobPosting);
+
+  const feedbackText = repliesAboutMe
+    .map((r) => `[${r.fromAgentLabel}] [${r.stance}]: ${r.comment}`)
+    .join("\n\n");
+
+  const rebuttalText = myRebuttal
+    ? myRebuttal.rebuttals.map((r) => `→ ${r.fromAgentId}에게: ${r.comment}`).join("\n")
+    : "없음";
+
+  // 에이전트별 JSON 스키마 (Round 0와 동일)
+  let jsonSchema: string;
+  if (agentId === "logic") {
+    jsonSchema = `{
+  "unverifiable": "<확인 불가 표현 직접 인용 + 이유. 없으면 '없음'>",
+  "logicErrors": "<모순/인과오류 문장 인용 + 설명. 없으면 '없음'>",
+  "weakestPoint": "<가장 취약한 지점 + 예상 후속 질문 형태>",
+  "reliabilityVerdict": "<높음 | 보통 | 낮음>",
+  "opinion": "<토론을 반영한 최종 평가 3~4문장. 수정된 판단이 있으면 왜 바꿨는지 1문장으로 밝히세요>"
+}`;
+  } else if (agentId === "technical") {
+    jsonSchema = `{
+  "leadershipVerdict": "<단독 주도 | 팀 참여 | 제안 수준 | 불명확>",
+  "leadershipEvidence": "<위 판정의 근거가 된 답변 직접 인용>",
+  "starMissing": "<빠진 STAR 항목과 이유. 없으면 '없음'>",
+  "practicalRisks": "<채용 시 예상 실무 리스크 1~2개>",
+  "deployVerdict": "<즉시 가능 | 온보딩 후 가능 | 추가 경험 필요>",
+  "opinion": "<토론을 반영한 최종 평가 3~4문장. 수정된 판단이 있으면 왜 바꿨는지 1문장으로 밝히세요>"
+}`;
+  } else {
+    jsonSchema = `{
+  "changeStage": "<1 | 2 | 3>",
+  "changeEvidence": "<위 판정 근거가 된 답변 직접 인용>",
+  "feedbackDirection": "<능동적 | 수동적 | 판단 불가>",
+  "growthDesign": "<설계 있음 | 설계 없음>",
+  "collaborationRole": "<주도형 | 지원형 | 불명확>",
+  "collaborationEvidence": "<위 판정의 근거가 된 답변 직접 인용>",
+  "contributionBalance": "<수혜/기여 비율 서술>",
+  "opinion": "<토론을 반영한 최종 평가 3~4문장. 수정된 판단이 있으면 왜 바꿨는지 1문장으로 밝히세요>"
+}`;
+  }
+
+  const systemPrompt = `당신은 오직 ${agent.label} 에이전트입니다.
+다른 에이전트의 관점을 대변하거나, 시스템 전체를 평가하거나, 다른 에이전트에게 조언하는 문장을 절대 쓰지 마세요.
+당신의 출력 항목 이외의 형식은 사용하지 마세요. 각 항목은 3문장 이내로 간결하게 작성하세요.
+불필요한 서론, 총평, 맺음말을 쓰지 마세요.
+반드시 유효한 JSON만 응답하세요 — 다른 텍스트 없이.`;
+
+  const userContent = `${contextBlock}
+
+[면접 대화 기록]
+${conversationText}
+
+[나의 Round 0 평가]
+${myEvaluation.opinion}
+
+[내가 받은 피드백]
+${feedbackText}
+
+[내 재반박]
+${rebuttalText}
+
+위 토론 전체를 반영하여 최종 의견을 작성하세요.
+수정된 판단이 있으면 왜 바꿨는지, 유지한 판단이 있으면 왜 유지하는지 opinion에 1문장으로 밝히세요.
+
+다음 JSON 형식으로 응답하세요:
+${jsonSchema}
+문자열 값 안에 마크다운 서식(**, *, #)을 사용하지 마세요.`;
+
+  const raw = await callOllama(systemPrompt, userContent);
+
+  if (agentId === "logic") {
+    const parsed = extractJSON<{
+      unverifiable: string; logicErrors: string; weakestPoint: string;
+      reliabilityVerdict: string; opinion: string;
+    }>(raw);
+    const highlights = [
+      parsed.unverifiable && parsed.unverifiable !== "없음" ? `검증 불가: ${parsed.unverifiable}` : null,
+      parsed.logicErrors && parsed.logicErrors !== "없음" ? `논리 오류: ${parsed.logicErrors}` : null,
+      parsed.weakestPoint ? `취약점: ${parsed.weakestPoint}` : null,
+    ].filter(Boolean) as string[];
+    return { agentId, agentLabel: agent.label, criterion: agent.criterion,
+      opinion: parsed.opinion ?? "", highlights: highlights.slice(0, 3),
+      verdict: parsed.reliabilityVerdict ?? "", verdictLabel: "종합 신뢰도" };
+  }
+
+  if (agentId === "technical") {
+    const parsed = extractJSON<{
+      leadershipVerdict: string; leadershipEvidence: string; starMissing: string;
+      practicalRisks: string; deployVerdict: string; opinion: string;
+    }>(raw);
+    const highlights = [
+      parsed.leadershipVerdict ? `경험 주도성: ${parsed.leadershipVerdict}${parsed.leadershipEvidence ? ` — "${parsed.leadershipEvidence}"` : ""}` : null,
+      parsed.starMissing && parsed.starMissing !== "없음" ? `STAR 미충족: ${parsed.starMissing}` : null,
+      parsed.practicalRisks ? `실무 리스크: ${parsed.practicalRisks}` : null,
+    ].filter(Boolean) as string[];
+    return { agentId, agentLabel: agent.label, criterion: agent.criterion,
+      opinion: parsed.opinion ?? "", highlights: highlights.slice(0, 3),
+      verdict: parsed.deployVerdict ?? "", verdictLabel: "즉시투입 판정" };
+  }
+
+  // organization
+  const parsed = extractJSON<{
+    changeStage: string; changeEvidence: string; feedbackDirection: string;
+    growthDesign: string; collaborationRole: string; collaborationEvidence: string;
+    contributionBalance: string; opinion: string;
+  }>(raw);
+  const highlights = [
+    parsed.changeStage ? `자기변화 ${parsed.changeStage}단계${parsed.changeEvidence ? ` — "${parsed.changeEvidence}"` : ""}` : null,
+    [parsed.feedbackDirection, parsed.growthDesign].filter(Boolean).join(", ") || null,
+    parsed.contributionBalance ? `기여 성향: ${parsed.contributionBalance}` : null,
+  ].filter(Boolean) as string[];
+  return { agentId, agentLabel: agent.label, criterion: agent.criterion,
+    opinion: parsed.opinion ?? "", highlights: highlights.slice(0, 3),
+    verdict: parsed.changeStage ? `${parsed.changeStage}단계` : "", verdictLabel: "자기변화" };
+}
+
+// ── 중재자: 최종 종합 (Round 3 최종 의견 기반) ───────────────────────────
 
 export async function generateModeratorResult(
-  evaluations: AgentEvaluation[],
+  finalOpinions: AgentFinalOpinion[],
   replies: AgentReply[],
+  rebuttals: AgentRebuttal[],
   messages: Message[],
   profile: ProfileContext,
   jobPosting: JobPostingContext,
@@ -369,7 +588,7 @@ export async function generateModeratorResult(
   const conversationText = buildConversationText(messages);
   const contextBlock = buildContextBlock(profile, jobPosting);
 
-  const evaluationsText = evaluations
+  const evaluationsText = finalOpinions
     .map((e) => {
       const verdictLine = e.verdict ? `판정: ${e.verdictLabel} — ${e.verdict}` : "";
       return `[${e.agentLabel}] 평가 영역: ${e.criterion}\n${e.opinion}\n핵심 포인트: ${e.highlights.join(" / ")}${verdictLine ? `\n${verdictLine}` : ""}`;
@@ -385,7 +604,14 @@ export async function generateModeratorResult(
     })
     .join("\n\n");
 
-  const systemPrompt = `당신은 중립적인 중재자입니다. 면접 패널의 토론이 끝났고, 3명 에이전트의 평가와 상호 피드백을 종합하여 최종 채용 판정을 내리는 것이 역할입니다.
+  const rebuttalsText = rebuttals
+    .map((r) => {
+      const lines = r.rebuttals.map((rb) => `  → ${rb.fromAgentId}에게: ${rb.comment}`).join("\n");
+      return `[${r.agentLabel}]\n${lines}`;
+    })
+    .join("\n\n");
+
+  const systemPrompt = `당신은 중립적인 중재자입니다. 면접 패널의 토론이 끝났고, 3명 에이전트의 최종 의견과 토론 과정을 종합하여 최종 채용 판정을 내리는 것이 역할입니다.
 반드시 유효한 JSON만 응답하세요 — 다른 텍스트 없이.`;
 
   const userContent = `${contextBlock}
@@ -393,13 +619,16 @@ export async function generateModeratorResult(
 [면접 대화 기록]
 ${conversationText}
 
-[Round 0 — 에이전트 독립 평가]
-${evaluationsText}
-
-[Round 1 — 에이전트 상호 피드백]
+[Round 1 — 상호 피드백]
 ${repliesText}
 
-위 평가와 토론 전체를 바탕으로 최종 채용 판정과 결과를 종합하세요.
+[Round 2 — 재반박]
+${rebuttalsText}
+
+[Round 3 — 에이전트 최종 의견]
+${evaluationsText}
+
+위 토론 전체(Round 1~3)와 최종 의견을 바탕으로 최종 채용 판정과 결과를 종합하세요.
 
 다음 JSON 형식으로 응답하세요:
 {

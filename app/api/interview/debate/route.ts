@@ -6,9 +6,13 @@ import { Message, Difficulty, AGENT_ORDER, ProfileContext, JobPostingContext } f
 import {
   generateAgentEvaluation,
   generateAgentReply,
+  generateAgentRebuttal,
+  generateAgentFinalOpinion,
   generateModeratorResult,
   AgentEvaluation,
   AgentReply,
+  AgentRebuttal,
+  AgentFinalOpinion,
 } from "@/lib/agents";
 
 async function runDebate(
@@ -58,23 +62,80 @@ async function runDebate(
       }
     }
 
+    // Round 2: 순차 재반박 — 각 에이전트가 자신에 대한 피드백에 응답
+    const rebuttals: AgentRebuttal[] = [];
+    for (const myEval of evaluations) {
+      // 이 에이전트를 향한 피드백 수집 (다른 에이전트들의 reply 중 targetAgentId가 나인 것)
+      const repliesAboutMe = replies.flatMap((r) =>
+        r.replies
+          .filter((reply) => reply.targetAgentId === myEval.agentId)
+          .map((reply) => ({
+            fromAgentId: r.agentId,
+            fromAgentLabel: r.agentLabel,
+            stance: reply.stance,
+            comment: reply.comment,
+          }))
+      );
+      if (repliesAboutMe.length === 0) continue;
+      try {
+        const rebuttal = await generateAgentRebuttal(myEval.agentId, myEval, repliesAboutMe, messages, profile, jobPosting);
+        rebuttals.push(rebuttal);
+        await supabase
+          .from("interview_sessions")
+          .update({ agentRebuttals: rebuttals as unknown as Json, updatedAt: new Date().toISOString() })
+          .eq("id", sessionId);
+      } catch {
+        continue;
+      }
+    }
+
+    // Round 3: 최종 의견 — 토론 전체를 반영한 각 에이전트의 업데이트된 입장
+    const finalOpinions: AgentFinalOpinion[] = [];
+    for (const myEval of evaluations) {
+      const repliesAboutMe = replies.flatMap((r) =>
+        r.replies
+          .filter((reply) => reply.targetAgentId === myEval.agentId)
+          .map((reply) => ({
+            fromAgentLabel: r.agentLabel,
+            stance: reply.stance,
+            comment: reply.comment,
+          }))
+      );
+      const myRebuttal = rebuttals.find((r) => r.agentId === myEval.agentId);
+      try {
+        const finalOpinion = await generateAgentFinalOpinion(
+          myEval.agentId, myEval, repliesAboutMe, myRebuttal, messages, profile, jobPosting
+        );
+        finalOpinions.push(finalOpinion);
+        await supabase
+          .from("interview_sessions")
+          .update({ agentFinalOpinions: finalOpinions as unknown as Json, updatedAt: new Date().toISOString() })
+          .eq("id", sessionId);
+      } catch {
+        continue;
+      }
+    }
+
     await supabase
       .from("interview_sessions")
       .update({ status: "finalizing", updatedAt: new Date().toISOString() })
       .eq("id", sessionId);
 
+    // 중재자: Round 3 최종 의견 기반 (없으면 Round 0 평가로 폴백)
+    const opinionsForModerator: AgentFinalOpinion[] =
+      finalOpinions.length > 0
+        ? finalOpinions
+        : evaluations.map((e) => ({ ...e }));
+
     const repliesForModerator: AgentReply[] =
       replies.length > 0
         ? replies
-        : evaluations.map((e) => ({
-            agentId: e.agentId,
-            agentLabel: e.agentLabel,
-            replies: [],
-          }));
+        : evaluations.map((e) => ({ agentId: e.agentId, agentLabel: e.agentLabel, replies: [] }));
 
     const moderatorResult = await generateModeratorResult(
-      evaluations,
+      opinionsForModerator,
       repliesForModerator,
+      rebuttals,
       messages,
       profile,
       jobPosting,
