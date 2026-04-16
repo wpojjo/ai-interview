@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { getAuthUser } from "@/lib/auth";
 import ProfileNameForm from "@/components/ProfileNameForm";
 

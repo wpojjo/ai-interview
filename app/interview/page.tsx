@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { getAuthUser } from "@/lib/auth";
 import InterviewSession from "@/components/InterviewSession";
 
@@ -17,13 +17,13 @@ async function checkReadiness() {
 
   const { data: jobPosting } = await supabase
     .from("job_postings")
-    .select("id, sourceUrl")
+    .select("id, responsibilities")
     .eq("userId", userId)
     .order("updatedAt", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!jobPosting?.sourceUrl)
+  if (!jobPosting?.responsibilities)
     return { ready: false, reason: "jobPosting" as const, name: profile.name };
 
   return { ready: true, name: profile.name };
