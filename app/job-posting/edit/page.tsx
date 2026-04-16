@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { getAuthUser } from "@/lib/auth";
 import JobPostingEditForm from "@/components/JobPostingEditForm";
 import { redirect } from "next/navigation";
