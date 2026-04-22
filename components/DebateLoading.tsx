@@ -409,10 +409,20 @@ export default function DebateLoading({ sessionId, avatarSeeds, onDone, onProcee
   if (viewPhase === "evaluating") {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">📋 개별 평가</span>
-          {isActive && !allEvalsReceived && (
-            <span className="text-xs text-gray-400 dark:text-slate-500">면접관들이 평가 중...</span>
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">📋 개별 평가</span>
+            {isActive && !allEvalsReceived && (
+              <span className="text-xs text-gray-400 dark:text-slate-500">면접관들이 평가 중...</span>
+            )}
+          </div>
+          {!isActive && (
+            <button
+              onClick={() => setViewPhase("debating")}
+              className="flex items-center gap-1.5 text-sm text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+            >
+              의견 교환 보기 →
+            </button>
           )}
         </div>
 
