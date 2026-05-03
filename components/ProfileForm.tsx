@@ -123,7 +123,7 @@ export default function ProfileForm({ name, initialData }: { name: string; initi
           <EmptyState text="학력 정보가 없습니다" />
         ) : educations.map((edu, i) => (
           <ItemCard key={i} onDelete={() => setEducations((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="학교명">
                 <input type="text" value={edu.schoolName} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, schoolName: e.target.value } : item))} placeholder="OO대학교" className="input" />
               </Field>
@@ -131,14 +131,10 @@ export default function ProfileForm({ name, initialData }: { name: string; initi
                 <input type="text" value={edu.major} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, major: e.target.value } : item))} placeholder="컴퓨터공학" className="input" />
               </Field>
               <Field label="학위">
-                <select value={edu.degree} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, degree: e.target.value as Education["degree"] } : item))} className="input">
-                  {["학사", "석사", "박사"].map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <SelectInput value={edu.degree} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, degree: e.target.value as Education["degree"] } : item))} options={["학사", "석사", "박사"]} />
               </Field>
               <Field label="졸업상태">
-                <select value={edu.graduationStatus} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, graduationStatus: e.target.value as Education["graduationStatus"] } : item))} className="input">
-                  {["재학중", "졸업", "졸업예정", "중퇴", "휴학중"].map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <SelectInput value={edu.graduationStatus} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, graduationStatus: e.target.value as Education["graduationStatus"] } : item))} options={["재학중", "졸업", "졸업예정", "중퇴", "휴학중"]} />
               </Field>
               <Field label="입학일">
                 <input type="month" value={edu.startDate} onChange={(e) => setEducations((p) => p.map((item, idx) => idx === i ? { ...item, startDate: e.target.value } : item))} className="input" />
@@ -161,7 +157,7 @@ export default function ProfileForm({ name, initialData }: { name: string; initi
           <EmptyState text="경력 정보가 없습니다" />
         ) : careers.map((career, i) => (
           <ItemCard key={i} onDelete={() => setCareers((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="회사명">
                 <input type="text" value={career.companyName} onChange={(e) => setCareers((p) => p.map((item, idx) => idx === i ? { ...item, companyName: e.target.value } : item))} placeholder="(주)OO회사" className="input" />
               </Field>
@@ -214,7 +210,7 @@ export default function ProfileForm({ name, initialData }: { name: string; initi
           <EmptyState text="대외활동 정보가 없습니다" />
         ) : activities.map((act, i) => (
           <ItemCard key={i} onDelete={() => setActivities((p) => p.filter((_, idx) => idx !== i))}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="활동명">
                 <input type="text" value={act.title} onChange={(e) => setActivities((p) => p.map((item, idx) => idx === i ? { ...item, title: e.target.value } : item))} placeholder="UX 스터디" className="input" />
               </Field>
@@ -305,10 +301,27 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+function SelectInput({ value, onChange, options }: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: string[];
+}) {
+  return (
+    <div className="relative">
+      <select value={value} onChange={onChange} className="input appearance-none">
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </span>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-gray-400 dark:text-slate-500">{label}</label>
+      <label className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</label>
       {children}
     </div>
   );
